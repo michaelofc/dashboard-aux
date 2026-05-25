@@ -34,8 +34,8 @@
   </head>
   <body>
     <!-- Efeitos especiais: parabéns e alerta (fora do container principal) -->
-    <div id="specialCongrats" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;"></div>
-    <div id="specialAlert" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;"></div>
+    <div id="specialCongrats" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;pointer-events:none;"></div>
+    <div id="specialAlert" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;pointer-events:none;"></div>
 
     <div class="container">
       <div class="header" style="margin-bottom: 16px;">
@@ -61,9 +61,6 @@
         <button id="tabGamificacao" class="tab-btn"><i class="fas fa-trophy"></i> Gamificação</button>
       </nav>
 
-      <!-- Efeitos especiais: parabéns e alerta -->
-      <div id="specialCongrats" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;pointer-events:none;"></div>
-      <div id="specialAlert" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;pointer-events:none;"></div>
       <!-- Área de conteúdo dinâmico -->
       <div id="app"></div>
     </div>
