@@ -119,10 +119,49 @@ const GamificationModule = (() => {
   }
 
   /**
+   * Carregar metas do painel admin
+   */
+  function loadAdminGoals() {
+    try {
+      const adminGoals = JSON.parse(localStorage.getItem('dashboard_goals') || '[]');
+      
+      if (adminGoals.length > 0) {
+        // Converter metas do admin para formato de gamificação
+        gamificationData.goals = adminGoals.map(goal => ({
+          id: goal.id,
+          tipo: goal.description || goal.scope,
+          meta: goal.targetValue,
+          alcancado: goal.currentValue || 0,
+          scope: goal.scope,
+          type: goal.type,
+          period: goal.period,
+          pointsPerAchievement: goal.pointsPerAchievement || 100
+        }));
+        
+        // Calcular pontos baseado em metas atingidas
+        let pontosGanhos = 0;
+        gamificationData.goals.forEach(goal => {
+          const percentualAtingido = Math.min((goal.alcancado / goal.meta) * 100, 100);
+          pontosGanhos += Math.floor((percentualAtingido / 100) * goal.pointsPerAchievement);
+        });
+        
+        gamificationData.totalPontos = pontosGanhos;
+        
+        console.log('📊 Metas carregadas do admin:', gamificationData.goals);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar metas do admin:', error);
+    }
+  }
+
+  /**
    * Carregar dados de gamificação
    */
   async function loadGamificationData() {
     try {
+      // Primeiro carregar metas do admin
+      loadAdminGoals();
+
       if (!apiClient) return;
 
       const [dashboard, stats] = await Promise.all([
