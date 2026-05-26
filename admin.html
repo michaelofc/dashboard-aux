@@ -309,6 +309,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('create')">➕ Criar Meta</button>
     <button class="tab-btn" onclick="switchTab('list')">📋 Listar Metas</button>
+    <button class="tab-btn" onclick="switchTab('report')">📊 Relatório</button>
     <button class="tab-btn" onclick="switchTab('settings')">⚙️ Configurações</button>
   </div>
 
@@ -368,9 +369,20 @@
         </div>
 
         <div>
-          <label>Redução de Inadimplência (%)</label>
-          <input type="number" id="targetValue" min="0" max="100" step="0.1" placeholder="3.0" value="0">
-          <small style="color: #666; display: block; margin-top: 4px;">Exemplo: 3 para reduzir 3% da inadimplência</small>
+          <label>Inadimplência Atual (%)</label>
+          <input type="number" id="currentInadempl" min="0" max="100" step="0.1" placeholder="12.5" value="0">
+          <small style="color: #666; display: block; margin-top: 4px;">Qual é a inadimplência ATUAL da filial?</small>
+        </div>
+
+        <div>
+          <label>Inadimplência Meta (%)</label>
+          <input type="number" id="targetInadempl" min="0" max="100" step="0.1" placeholder="9.5" value="0" onchange="calculateReduction()">
+          <small style="color: #666; display: block; margin-top: 4px;">Qual deve ser a inadimplência no final do período?</small>
+        </div>
+
+        <div style="padding: 12px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px;">
+          <label style="color: #92400e; font-weight: 600;">Redução Necessária</label>
+          <p style="color: #92400e; margin-top: 8px; font-size: 18px; font-weight: bold;"><span id="reductionDisplay">0.0%</span></p>
         </div>
 
         <div>
@@ -436,6 +448,65 @@
     </div>
   </div>
 
+  <!-- Tab: Relatório -->
+  <div id="report" class="tab-content">
+    <div class="form-section">
+      <h2>📊 Relatório de Metas</h2>
+      
+      <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <input type="text" id="reportSearch" placeholder="🔍 Procurar por filial..." style="flex: 1; min-width: 200px; padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
+        <select id="reportFilter" style="padding: 12px; border: 1px solid #ddd; border-radius: 8px;">
+          <option value="">Todos os tipos</option>
+          <option value="individual">Individual</option>
+          <option value="regional">Regional</option>
+          <option value="diretoria">Diretoria</option>
+        </select>
+        <button class="btn" onclick="printReport()" style="background: #3b82f6;">🖨️ Imprimir</button>
+      </div>
+
+      <div id="reportContainer" style="overflow-x: auto;">
+        <table class="goals-table">
+          <thead>
+            <tr>
+              <th>Filial/Escopo</th>
+              <th>Tipo</th>
+              <th>Período</th>
+              <th>Inadimplência Atual</th>
+              <th>Inadimplência Meta</th>
+              <th>Redução Necessária</th>
+              <th>Dados Finais</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="reportTableBody">
+            <tr>
+              <td colspan="9" style="text-align: center; color: #999;">Carregando relatório...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="reportSummary" style="margin-top: 30px; padding: 20px; background: #f3f4f6; border-radius: 8px; display: none;">
+        <h3>Resumo do Período</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+          <div style="padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #3b82f6;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Total de Metas</div>
+            <div style="font-size: 24px; font-weight: bold; color: #1f2937;" id="totalGoals">0</div>
+          </div>
+          <div style="padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #10b981;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Metas Alcançadas</div>
+            <div style="font-size: 24px; font-weight: bold; color: #10b981;" id="achievedGoals">0</div>
+          </div>
+          <div style="padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #f59e0b;">
+            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Taxa de Sucesso</div>
+            <div style="font-size: 24px; font-weight: bold; color: #f59e0b;" id="successRate">0%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Tab: Configurações -->
   <div id="settings" class="tab-content">
     <div class="form-section">
@@ -471,6 +542,20 @@ document.addEventListener('DOMContentLoaded', () => {
   localStorage.setItem(PASSWORD_KEY, savedPassword);
   
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
+  
+  // Adicionar listeners para filtros de relatório
+  const reportSearch = document.getElementById('reportSearch');
+  const reportFilter = document.getElementById('reportFilter');
+  
+  if (reportSearch) reportSearch.addEventListener('input', loadReport);
+  if (reportFilter) reportFilter.addEventListener('change', loadReport);
+  
+  // Adicionar listeners para filtros de metas
+  const searchGoals = document.getElementById('searchGoals');
+  const filterType = document.getElementById('filterType');
+  
+  if (searchGoals) searchGoals.addEventListener('input', loadGoals);
+  if (filterType) filterType.addEventListener('change', loadGoals);
   
   if (isAuthenticated()) {
     showAdminPanel();
@@ -521,6 +606,13 @@ function switchTab(tabName) {
   // Mostrar tab selecionado
   document.getElementById(tabName).classList.add('active');
   event.target.classList.add('active');
+
+  // Carregar dados específicos da aba
+  if (tabName === 'list') {
+    loadGoals();
+  } else if (tabName === 'report') {
+    loadReport();
+  }
 }
 
 function updateGoalForm() {
@@ -598,23 +690,38 @@ function formatDateISO(date) {
   return `${year}-${month}-${day}`;
 }
 
+function calculateReduction() {
+  const current = parseFloat(document.getElementById('currentInadempl').value) || 0;
+  const target = parseFloat(document.getElementById('targetInadempl').value) || 0;
+  const reduction = current - target;
+  document.getElementById('reductionDisplay').textContent = reduction.toFixed(1) + '%';
+}
+
 function createGoal() {
+  const current = parseFloat(document.getElementById('currentInadempl').value);
+  const target = parseFloat(document.getElementById('targetInadempl').value);
+  const reduction = current - target;
+
   const goal = {
     id: Date.now(),
     type: document.getElementById('goalType').value,
     scope: document.getElementById('scope').value,
     period: document.getElementById('period').value,
-    targetValue: parseFloat(document.getElementById('targetValue').value),
+    currentInadempl: current,
+    targetInadempl: target,
+    reductionNeeded: reduction,
     description: document.getElementById('description').value,
     startDate: document.getElementById('startDate').value,
     endDate: document.getElementById('endDate').value,
+    monthReference: document.getElementById('monthReference').value,
     pointsPerAchievement: parseInt(document.getElementById('pointsPerAchievement').value),
     createdAt: new Date().toISOString(),
-    currentValue: 0
+    finalInadempl: null,
+    status: 'active'
   };
 
-  if (!goal.scope || !goal.targetValue) {
-    alert('⚠️ Preencha todos os campos obrigatórios!');
+  if (!goal.scope || goal.currentInadempl < 0 || goal.targetInadempl < 0) {
+    alert('⚠️ Preencha todos os campos obrigatórios corretamente!');
     return;
   }
 
@@ -624,7 +731,7 @@ function createGoal() {
 
   // Mostrar mensagem de sucesso
   const successDiv = document.getElementById('successMessage');
-  successDiv.innerHTML = `✅ Meta "${goal.description}" criada com sucesso!`;
+  successDiv.innerHTML = `✅ Meta "${goal.description || goal.scope}" criada com sucesso!`;
   successDiv.style.display = 'block';
   setTimeout(() => {
     successDiv.style.display = 'none';
@@ -633,7 +740,8 @@ function createGoal() {
   // Limpar formulário
   document.getElementById('goalType').value = 'individual';
   document.getElementById('scope').value = '';
-  document.getElementById('targetValue').value = '';
+  document.getElementById('currentInadempl').value = '0';
+  document.getElementById('targetInadempl').value = '0';
   document.getElementById('description').value = '';
   document.getElementById('startDate').value = '';
   document.getElementById('endDate').value = '';
@@ -670,13 +778,13 @@ function loadGoals() {
     <tr>
       <td><span class="level-badge">${goal.type}</span></td>
       <td><strong>${goal.scope}</strong></td>
-      <td>${goal.targetValue.toFixed(2)}%</td>
+      <td>${goal.currentInadempl?.toFixed(2) || goal.targetValue?.toFixed(2) || '0'}%</td>
       <td>${goal.period}</td>
       <td>${goal.description}</td>
-      <td>${new Date(goal.startDate).toLocaleDateString('pt-BR')}</td>
-      <td>${new Date(goal.endDate).toLocaleDateString('pt-BR')}</td>
+      <td>${goal.startDate ? new Date(goal.startDate).toLocaleDateString('pt-BR') : '-'}</td>
+      <td>${goal.endDate ? new Date(goal.endDate).toLocaleDateString('pt-BR') : '-'}</td>
       <td>
-        <span style="color: #10b981; font-weight: 600;">Ativa</span>
+        <span style="color: #10b981; font-weight: 600;">${goal.status === 'completed' ? 'Finalizada' : 'Ativa'}</span>
       </td>
       <td>
         <button class="btn-small btn-edit" onclick="editGoal(${goal.id})">✏️ Editar</button>
@@ -705,18 +813,239 @@ function editGoal(id) {
   document.getElementById('goalType').value = goal.type;
   document.getElementById('scope').value = goal.scope;
   document.getElementById('period').value = goal.period;
-  document.getElementById('targetValue').value = goal.targetValue;
+  document.getElementById('currentInadempl').value = goal.currentInadempl || '';
+  document.getElementById('targetInadempl').value = goal.targetInadempl || '';
   document.getElementById('description').value = goal.description;
   document.getElementById('startDate').value = goal.startDate;
   document.getElementById('endDate').value = goal.endDate;
   document.getElementById('pointsPerAchievement').value = goal.pointsPerAchievement;
+  document.getElementById('monthReference').value = goal.monthReference || '';
 
+  calculateReduction();
   updateGoalForm();
 
   // Deletar meta antiga e ir para aba de criação
   deleteGoal(id);
   switchTab('create');
-  document.querySelector('[onclick="switchTab(\'create\')"]').click();
+}
+
+function loadReport() {
+  const goals = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const filterType = document.getElementById('reportFilter')?.value || '';
+  const search = document.getElementById('reportSearch')?.value.toLowerCase() || '';
+
+  let filtered = goals;
+  
+  if (filterType) {
+    filtered = filtered.filter(g => g.type === filterType);
+  }
+
+  if (search) {
+    filtered = filtered.filter(g => 
+      g.scope.toLowerCase().includes(search) ||
+      g.description.toLowerCase().includes(search)
+    );
+  }
+
+  const tbody = document.getElementById('reportTableBody');
+  
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #999;">Nenhuma meta encontrada</td></tr>';
+    document.getElementById('reportSummary').style.display = 'none';
+    return;
+  }
+
+  // Renderizar tabela
+  tbody.innerHTML = filtered.map(goal => {
+    const achieved = goal.finalInadempl !== null && goal.finalInadempl <= goal.targetInadempl;
+    const statusColor = goal.status === 'completed' ? (achieved ? '#10b981' : '#ef4444') : '#f59e0b';
+    const statusText = goal.status === 'completed' ? (achieved ? '✅ Atingida' : '❌ Não Atingida') : '⏳ Em Andamento';
+    
+    return `
+      <tr>
+        <td><strong>${goal.scope}</strong></td>
+        <td><span class="level-badge">${goal.type}</span></td>
+        <td>${goal.period}</td>
+        <td>${goal.currentInadempl?.toFixed(2) || '-'}%</td>
+        <td>${goal.targetInadempl?.toFixed(2) || '-'}%</td>
+        <td>${goal.reductionNeeded?.toFixed(2) || '-'}%</td>
+        <td>${goal.finalInadempl !== null ? goal.finalInadempl.toFixed(2) + '%' : '-'}</td>
+        <td><span style="color: ${statusColor}; font-weight: 600;">${statusText}</span></td>
+        <td>
+          <button class="btn-small" onclick="updateGoalFinal(${goal.id})" style="background: #3b82f6;">📝 Finalizar</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Calcular resumo
+  const completed = filtered.filter(g => g.status === 'completed').length;
+  const achieved = filtered.filter(g => g.status === 'completed' && g.finalInadempl <= g.targetInadempl).length;
+  const successRate = completed > 0 ? Math.round((achieved / completed) * 100) : 0;
+
+  document.getElementById('totalGoals').textContent = filtered.length;
+  document.getElementById('achievedGoals').textContent = achieved;
+  document.getElementById('successRate').textContent = successRate + '%';
+  document.getElementById('reportSummary').style.display = 'block';
+}
+
+function updateGoalFinal(id) {
+  const goals = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const goal = goals.find(g => g.id === id);
+  
+  if (!goal) return;
+
+  const finalInadempl = prompt(`Qual foi a inadimplência final de ${goal.scope}? (em %)`, goal.finalInadempl || '');
+  
+  if (finalInadempl === null) return;
+
+  const final = parseFloat(finalInadempl);
+  if (isNaN(final)) {
+    alert('❌ Valor inválido!');
+    return;
+  }
+
+  goal.finalInadempl = final;
+  goal.status = 'completed';
+
+  const index = goals.findIndex(g => g.id === id);
+  goals[index] = goal;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
+
+  loadReport();
+}
+
+function printReport() {
+  const goals = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  
+  if (goals.length === 0) {
+    alert('⚠️ Nenhuma meta para imprimir!');
+    return;
+  }
+
+  const filterType = document.getElementById('reportFilter')?.value || '';
+  const search = document.getElementById('reportSearch')?.value.toLowerCase() || '';
+
+  let filtered = goals;
+  
+  if (filterType) {
+    filtered = filtered.filter(g => g.type === filterType);
+  }
+
+  if (search) {
+    filtered = filtered.filter(g => 
+      g.scope.toLowerCase().includes(search) ||
+      g.description.toLowerCase().includes(search)
+    );
+  }
+
+  // Criar HTML para impressão
+  let html = `
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Relatório de Metas - Inadimplência</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { color: #667eea; margin-bottom: 5px; }
+          .header p { color: #666; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          th { background: #667eea; color: white; padding: 12px; text-align: left; font-weight: bold; }
+          td { padding: 10px 12px; border-bottom: 1px solid #ddd; }
+          tr:nth-child(even) { background: #f9fafb; }
+          .achieved { color: #10b981; font-weight: bold; }
+          .not-achieved { color: #ef4444; font-weight: bold; }
+          .pending { color: #f59e0b; font-weight: bold; }
+          .summary { margin-top: 40px; padding: 20px; background: #f3f4f6; border-radius: 8px; }
+          .summary h3 { color: #667eea; margin-bottom: 15px; }
+          .summary-item { display: inline-block; margin-right: 30px; }
+          .summary-value { font-size: 24px; font-weight: bold; color: #667eea; }
+          .footer { margin-top: 40px; text-align: center; color: #999; font-size: 12px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>📊 Relatório de Metas de Inadimplência</h1>
+          <p>Data: ${new Date().toLocaleDateString('pt-BR')}</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Filial/Escopo</th>
+              <th>Tipo</th>
+              <th>Período</th>
+              <th>Inadimplência Atual</th>
+              <th>Inadimplência Meta</th>
+              <th>Redução Necessária</th>
+              <th>Inadimplência Final</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
+
+  filtered.forEach(goal => {
+    const achieved = goal.finalInadempl !== null && goal.finalInadempl <= goal.targetInadempl;
+    const statusClass = goal.status === 'completed' ? (achieved ? 'achieved' : 'not-achieved') : 'pending';
+    const statusText = goal.status === 'completed' ? (achieved ? '✅ ATINGIDA' : '❌ NÃO ATINGIDA') : '⏳ EM ANDAMENTO';
+    
+    html += `
+      <tr>
+        <td><strong>${goal.scope}</strong></td>
+        <td>${goal.type}</td>
+        <td>${goal.period}</td>
+        <td>${goal.currentInadempl?.toFixed(2) || '-'}%</td>
+        <td>${goal.targetInadempl?.toFixed(2) || '-'}%</td>
+        <td>${goal.reductionNeeded?.toFixed(2) || '-'}%</td>
+        <td>${goal.finalInadempl !== null ? goal.finalInadempl.toFixed(2) + '%' : '-'}</td>
+        <td><span class="${statusClass}">${statusText}</span></td>
+      </tr>
+    `;
+  });
+
+  const completed = filtered.filter(g => g.status === 'completed').length;
+  const achieved = filtered.filter(g => g.status === 'completed' && g.finalInadempl <= g.targetInadempl).length;
+  const successRate = completed > 0 ? Math.round((achieved / completed) * 100) : 0;
+
+  html += `
+          </tbody>
+        </table>
+
+        <div class="summary">
+          <h3>Resumo do Período</h3>
+          <div class="summary-item">
+            <div>Total de Metas</div>
+            <div class="summary-value">${filtered.length}</div>
+          </div>
+          <div class="summary-item">
+            <div>Metas Atingidas</div>
+            <div class="summary-value">${achieved}</div>
+          </div>
+          <div class="summary-item">
+            <div>Taxa de Sucesso</div>
+            <div class="summary-value">${successRate}%</div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>Relatório gerado automaticamente pelo Sistema de Metas</p>
+          <p>${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  
+  setTimeout(() => {
+    win.print();
+  }, 250);
 }
 
 function changePassword() {
