@@ -1049,9 +1049,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             }
           }
           
-          // Se ainda não encontrou, usar primeira equipe
-          if (!filialToSearch && uniqueTeams && uniqueTeams.length > 0) {
-            filialToSearch = uniqueTeams[0];
+          // Se ainda não encontrou, usar primeira meta do admin panel como fallback
+          if (!filialToSearch && adminGoals.length > 0) {
+            filialToSearch = adminGoals[0]?.scope;
           }
           
           if (!filialToSearch) return 0.25;
