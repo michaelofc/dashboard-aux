@@ -1,6 +1,12 @@
 {
-  "buildCommand": "echo 'Static site - no build needed'",
+  "buildCommand": "exit 0",
   "outputDirectory": ".",
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
   "cleanUrls": true,
   "trailingSlash": false,
   "headers": [
