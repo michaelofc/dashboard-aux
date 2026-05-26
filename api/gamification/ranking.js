@@ -1,6 +1,7 @@
 /**
  * Vercel Serverless: /api/gamification/ranking
  * Retorna ranking de usuários
+ * Versão: 1.0.0
  */
 
 export default function handler(req, res) {

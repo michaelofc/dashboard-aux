@@ -1,6 +1,7 @@
 /**
  * Vercel Serverless: /api/gamification/stats
  * Retorna estatísticas de gamificação
+ * Versão: 1.0.0
  */
 
 export default function handler(req, res) {

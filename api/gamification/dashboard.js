@@ -1,6 +1,7 @@
 /**
  * Vercel Serverless: /api/gamification/dashboard
  * Retorna dados do painel de gamificação
+ * Versão: 1.0.0
  */
 
 export default function handler(req, res) {
