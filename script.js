@@ -1003,32 +1003,45 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     // Função para buscar a meta do admin panel baseado na filial e período
-    function getMetaFromAdmin(filialName, periodo, dataRef) {
+    function getMetaFromAdmin(selectedTeam, periodo, dataRef) {
       try {
         const adminGoals = JSON.parse(localStorage.getItem('dashboard_goals') || '[]');
         if (!adminGoals || adminGoals.length === 0) return 0.25; // padrão 25%
         
+        // Determinar qual filial procurar
+        let filialToSearch = selectedTeam;
+        if (!filialToSearch || filialToSearch === 'Todas' || filialToSearch === 'Geral') {
+          // Se nenhuma equipe selecionada, procurar a primeira equipe dos dados
+          if (uniqueTeams && uniqueTeams.length > 0) {
+            filialToSearch = uniqueTeams[0];
+          } else {
+            return 0.25; // padrão
+          }
+        }
+        
         // Procurar meta correspondente
         for (const goal of adminGoals) {
-          // Verificar se é individual (filial) e tem nome correspondente
+          // Procurar meta individual por filial
           if (goal.type === 'Individual (Por Filial)' && goal.scope) {
             const goalFilial = goal.scope.toLowerCase().trim();
-            const currentFilial = filialName.toLowerCase().trim();
+            const searchFilial = filialToSearch.toLowerCase().trim();
             
-            // Se encontrou filial correspondente
-            if (goalFilial === currentFilial || currentFilial.includes(goalFilial) || goalFilial.includes(currentFilial)) {
-              // Verificar se está dentro do período da meta
+            // Comparação flexível
+            if (goalFilial === searchFilial || searchFilial.includes(goalFilial) || goalFilial.includes(searchFilial)) {
+              // Verificar período
               if (goal.startDate && goal.endDate && dataRef) {
                 const metaIni = new Date(goal.startDate);
                 const metaFim = new Date(goal.endDate);
                 if (dataRef >= metaIni && dataRef <= metaFim) {
-                  // Retornar como decimal (ex: 0.15 para 15%)
+                  console.log(`✅ Meta encontrada para ${goal.scope}: ${goal.targetInadempl}%`);
                   return (goal.targetInadempl || 25) / 100;
                 }
               }
             }
           }
         }
+        
+        console.log(`⚠️ Nenhuma meta encontrada para ${filialToSearch}, usando padrão 25%`);
       } catch (e) {
         console.warn('Erro ao buscar meta do admin:', e);
       }
