@@ -1003,7 +1003,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     // Função para buscar a meta do admin panel baseado na filial e período
-    function getMetaFromAdmin(selectedTeam, periodo, dataRef) {
+    const getMetaFromAdmin = window.getMetaFromAdmin = function(selectedTeam, periodo, dataRef) {
       try {
         const adminGoals = JSON.parse(localStorage.getItem('dashboard_goals') || '[]');
         if (!adminGoals || adminGoals.length === 0) return 0.25; // padrão 25%
@@ -1102,7 +1102,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       return 0.25; // padrão 25%
     }
 
-    function updateDashboard() {
+    const updateDashboard = window.updateDashboard = function() {
   // Se a view do Dashboard não está montada, não atualiza DOM
   if (!document.getElementById('dashboard-container')) return;
       const monthRef = document.getElementById('monthSelect').value || uniqueMonths[uniqueMonths.length - 1];
