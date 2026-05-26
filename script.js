@@ -1059,21 +1059,37 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         
         // Procurar meta correspondente
         for (const goal of adminGoals) {
-          // Procurar meta individual por filial
-          if (goal.type === 'Individual (Por Filial)' && goal.scope) {
+          // Procurar meta individual por filial - aceita múltiplos formatos de tipo
+          const isIndividualGoal = goal.type === 'individual' || 
+                                   goal.type === 'Individual' || 
+                                   goal.type === 'Individual (Por Filial)';
+          
+          if (isIndividualGoal && goal.scope) {
             const goalFilial = goal.scope.toLowerCase().trim();
             const searchFilial = filialToSearch.toLowerCase().trim();
             
             // Comparação flexível
             if (goalFilial === searchFilial || searchFilial.includes(goalFilial) || goalFilial.includes(searchFilial)) {
-              // Verificar período
-              if (goal.startDate && goal.endDate && dataRef) {
-                const metaIni = new Date(goal.startDate);
-                const metaFim = new Date(goal.endDate);
-                if (dataRef >= metaIni && dataRef <= metaFim) {
-                  console.log(`✅ Meta encontrada para ${goal.scope}: ${goal.targetInadempl}%`);
+              // Verificar período (se dataRef é fornecido)
+              if (goal.period) {
+                // Se o período é 'período 8-2', validar com base no mês de referência
+                if (goal.period.toLowerCase().includes('período 8-2') || goal.period.toLowerCase().includes('período-8-2')) {
+                  // Para período 8-2, usar o período calculado em vez de datas específicas
+                  console.log(`✅ Meta encontrada para ${goal.scope}: ${goal.targetInadempl}% (Período 8-2)`);
                   return (goal.targetInadempl || 25) / 100;
+                } else if (goal.startDate && goal.endDate && dataRef) {
+                  // Para outros períodos, verificar datas
+                  const metaIni = new Date(goal.startDate);
+                  const metaFim = new Date(goal.endDate);
+                  if (dataRef >= metaIni && dataRef <= metaFim) {
+                    console.log(`✅ Meta encontrada para ${goal.scope}: ${goal.targetInadempl}%`);
+                    return (goal.targetInadempl || 25) / 100;
+                  }
                 }
+              } else {
+                // Se não há período especificado, aceitar a meta
+                console.log(`✅ Meta encontrada para ${goal.scope}: ${goal.targetInadempl}%`);
+                return (goal.targetInadempl || 25) / 100;
               }
             }
           }
