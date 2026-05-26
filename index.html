@@ -65,7 +65,16 @@
       <div id="app"></div>
     </div>
 
-  <!-- Script unificado -->
-  <script defer src="script.js"></script>
+  <!-- Script para carregar API Client -->
+  <script type="module" src="frontend/api-loader.js?v=3"></script>
+  
+  <!-- Scripts principais -->
+  <script defer src="script.js?v=3"></script>
+  <script defer src="frontend/gamification.js?v=3"></script>
+  
+  <!-- Force no-cache para esses scripts -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   </body>
 </html>

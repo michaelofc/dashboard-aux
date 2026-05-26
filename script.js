@@ -190,6 +190,8 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             </select>
           </div>
           <button id="btnExportPdf" class="tab-btn" style="background:#64748b;color:#fff;border:none;">Imprimir / PDF</button>
+          <button id="btnExportExcel" class="tab-btn" style="background:#10b981;color:#fff;border:none;">📊 Excel</button>
+          <button id="btnExportPdfApi" class="tab-btn" style="background:#f59e0b;color:#fff;border:none;">📄 PDF</button>
           <button id="refreshBtn" class="tab-btn" style="background:#e9bc29;color:#000;border:none;">Atualizar Dados</button>
         </div>
         <div style="margin-bottom:12px; font-size:1.05rem; color:#e2e8f0;">
@@ -357,6 +359,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         <div class="statistics-section"><div class="statistics-container" id="statisticsContainer"></div></div>
         <div class="motivation-section"><div id="motivationText">Carregando mensagem motivacional...</div></div>
         <div class="loading" id="loadingMsg">Carregando dados regionais consolidados...</div>
+        
+        <!-- Gamificação do Usuário -->
+        <div id="gamificationContainer" style="margin-top: 30px; padding-top: 30px; border-top: 2px solid #e5e7eb;"></div>
       </div>`;
     }
   };
@@ -430,7 +435,13 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const GID_AUX = '2018703213';
       let url = SHEET_CSV_URL.replace(/gid=\d+/, 'gid='+GID_AUX); if (!/gid=\d+/.test(url)) url += (url.includes('?')?'&':'?') + 'gid='+GID_AUX;
       try {
-        const resp = await fetch(url + '&cache=' + Date.now()); if (!resp.ok) throw new Error('Erro ao buscar aba Dados_Auxiliares');
+        // Usar proxy do backend para evitar CORS na Vercel
+        const baseUrl = window.location.origin;
+        const proxyUrl = `${baseUrl}/api/sheet/fetch-csv?url=` + encodeURIComponent(url);
+        console.log('📊 Carregando aba auxiliar via proxy:', proxyUrl);
+        const resp = await fetch(proxyUrl);
+        if (!resp.ok) throw new Error('Erro ao buscar aba Dados_Auxiliares');
+        console.log('✅ Aba auxiliar carregada com sucesso');
         const csv = await resp.text();
         let arr = csvToArray(csv, ';');
         if (arr[0].length <= 1) arr = csvToArray(csv, ',');
@@ -796,6 +807,132 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       try { win.focus(); } catch(_) {}
     }
 
+    // ===== EXPORTAÇÃO VIA API =====
+
+    async function exportToExcel() {
+      try {
+        const periodo = document.getElementById('monthSelect')?.value || '';
+        const equipe = document.getElementById('teamFilter')?.value || '';
+        const vendedor = document.getElementById('vendedorFilter')?.value || '';
+        const statusValue = document.getElementById('statusFilter')?.value || '';
+        
+        // Mapear valores de status
+        let status = 'Atrasados + Cancelados';
+        if (statusValue === 'ATRASADO') status = 'Somente Atrasados';
+        if (statusValue === 'CANCELADO') status = 'Somente Cancelados';
+
+        const btnExcel = document.getElementById('btnExportExcel');
+        btnExcel.disabled = true;
+        btnExcel.textContent = '⏳ Gerando...';
+
+        // Usar fetch direto com header de autorização
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          throw new Error('Token não encontrado. Faça login novamente.');
+        }
+
+        const response = await fetch('/api/export/excel', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            periodo: periodo || undefined,
+            equipe: equipe || undefined,
+            vendedor: vendedor || undefined,
+            status
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || `Erro HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `inadimplencia_${new Date().getTime()}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        alert('✅ Excel exportado com sucesso!');
+      } catch (error) {
+        console.error('Erro ao exportar Excel:', error);
+        alert(`❌ Erro ao exportar Excel: ${error.message}`);
+      } finally {
+        const btnExcel = document.getElementById('btnExportExcel');
+        btnExcel.disabled = false;
+        btnExcel.textContent = '📊 Excel';
+      }
+    }
+
+    async function exportToPdfApi() {
+      try {
+        const periodo = document.getElementById('monthSelect')?.value || '';
+        const equipe = document.getElementById('teamFilter')?.value || '';
+        const vendedor = document.getElementById('vendedorFilter')?.value || '';
+        const statusValue = document.getElementById('statusFilter')?.value || '';
+        
+        // Mapear valores de status
+        let status = 'Atrasados + Cancelados';
+        if (statusValue === 'ATRASADO') status = 'Somente Atrasados';
+        if (statusValue === 'CANCELADO') status = 'Somente Cancelados';
+
+        const btnPdfApi = document.getElementById('btnExportPdfApi');
+        btnPdfApi.disabled = true;
+        btnPdfApi.textContent = '⏳ Gerando...';
+
+        // Usar fetch direto com header de autorização
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          throw new Error('Token não encontrado. Faça login novamente.');
+        }
+
+        const response = await fetch('/api/export/pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            periodo: periodo || undefined,
+            equipe: equipe || undefined,
+            vendedor: vendedor || undefined,
+            status
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || `Erro HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `inadimplencia_${new Date().getTime()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        alert('✅ PDF exportado com sucesso!');
+      } catch (error) {
+        console.error('Erro ao exportar PDF:', error);
+        alert(`❌ Erro ao exportar PDF: ${error.message}`);
+      } finally {
+        const btnPdfApi = document.getElementById('btnExportPdfApi');
+        btnPdfApi.disabled = false;
+        btnPdfApi.textContent = '📄 PDF';
+      }
+    }
+
     function createRadialCharts() {
       if (!vencimentoData || vencimentoData.length===0) return;
       const maxPercentualItem = vencimentoData.reduce((max, item)=> item.percentual>max.percentual?item:max, vencimentoData[0]);
@@ -1127,7 +1264,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       }
       try {
         document.getElementById('loadingMsg').style.display = 'block';
-        const resp = await fetch(SHEET_CSV_URL + '&cache=' + Date.now()); if (!resp.ok) throw new Error('Erro ao buscar planilha'); const csv = await resp.text();
+        // Usar proxy do backend para evitar CORS na Vercel
+        const baseUrl = window.location.origin; // Pega a origem atual (localhost ou Vercel)
+        const proxyUrl = `${baseUrl}/api/sheet/fetch-csv?url=` + encodeURIComponent(SHEET_CSV_URL);
+        console.log('📊 Carregando planilha via proxy:', proxyUrl);
+        const resp = await fetch(proxyUrl); 
+        if (!resp.ok) throw new Error('Erro ao buscar planilha: ' + resp.statusText); 
+        console.log('✅ Planilha carregada com sucesso via proxy');
+        const csv = await resp.text();
         const delim = detectDelimiter(csv);
         const rows = csv.trim().split(/\r?\n/).map(l=> l.split(delim));
         const headers = rows[0].map(h => (h||'').toString().trim().toLowerCase());
@@ -1173,7 +1317,22 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         uniqueVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
         uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
         fillFilters(); await loadAuxSheet(); document.getElementById('loadingMsg').style.display='none'; processVencimentoData(); setTimeout(()=>updateDashboard(),100);
-      } catch (e) { document.getElementById('loadingMsg').textContent = 'Erro ao carregar dados: ' + e.message; }
+      } catch (e) { 
+        console.error('❌ Erro ao carregar dados:', e);
+        document.getElementById('loadingMsg').innerHTML = `
+          <div style="color: #ef4444; padding: 16px; background: #fee2e2; border-radius: 8px; margin: 12px 0;">
+            <strong>⚠️ Erro ao carregar planilha:</strong><br>
+            ${e.message}<br><br>
+            <small>Verifique:
+              <ul style="margin: 8px 0; padding-left: 20px;">
+                <li>URL da planilha está correta?</li>
+                <li>Planilha está publicada em "Publicar na web"?</li>
+                <li>Backend está respondendo em /api/sheet/fetch-csv?</li>
+              </ul>
+            </small>
+          </div>
+        `;
+      }
     }
 
     function setupVencimentoEventListeners() {
@@ -1190,6 +1349,10 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
   if (refreshBtn) refreshBtn.onclick = async () => { try { refreshBtn.disabled = true; refreshBtn.textContent = 'Atualizando...'; await loadSheetData(); } finally { refreshBtn.disabled = false; refreshBtn.textContent = 'Atualizar Dados'; } };
   const btnPdf = document.getElementById('btnExportPdf');
   if (btnPdf) btnPdf.addEventListener('click', exportInadReportPdf);
+  const btnExcel = document.getElementById('btnExportExcel');
+  if (btnExcel) btnExcel.addEventListener('click', exportToExcel);
+  const btnPdfApi = document.getElementById('btnExportPdfApi');
+  if (btnPdfApi) btnPdfApi.addEventListener('click', exportToPdfApi);
       const toggle6 = document.getElementById('toggle6Months'); const toggle12 = document.getElementById('toggle12Months'); const toggleProd = document.getElementById('toggleProduction');
       if (toggle6) toggle6.addEventListener('click', ()=>{ showingMonths=6; showingProduction=false; createEvolutionChart(); });
       if (toggle12) toggle12.addEventListener('click', ()=>{ showingMonths=12; showingProduction=false; createEvolutionChart(); });
@@ -1317,7 +1480,11 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const { ini, fim } = getPeriodo82(new Date(ano, mes-1, 1));
       const promises = GAMIFICACAO_SOURCES.map(async (src) => {
         try {
-          const csv = await fetchCsv(src.url);
+          // Usar proxy do backend para evitar CORS na Vercel
+          const baseUrl = window.location.origin;
+          const proxyUrl = `${baseUrl}/api/sheet/fetch-csv?url=` + encodeURIComponent(src.url);
+          const resp = await fetchWithTimeout(proxyUrl);
+          const csv = await resp.text();
           const rows = parseCSV(csv).filter(r => r.dataVenda >= ini && r.dataVenda <= fim);
           return rows.map(r => ({ ...r, filial: r.filial || src.nome || 'Filial', regional: r.regional || src.regional || '', diretoria: r.diretoria || src.diretoria || '' }));
         } catch (e) {
@@ -1337,7 +1504,10 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (!url) return [];
       if (!selectedMonth) selectedMonth = ensureSelectedMonth();
       try {
-        const resp = await fetch((url.includes('/pubhtml')?url.replace('/pubhtml','/pub')+'&output=csv':url) + (url.includes('?')?'&':'?') + 'cache=' + Date.now());
+        // Usar proxy do backend para evitar CORS na Vercel
+        const baseUrl = window.location.origin;
+        const proxyUrl = `${baseUrl}/api/sheet/fetch-csv?url=` + encodeURIComponent(url);
+        const resp = await fetch(proxyUrl);
         if (!resp.ok) throw new Error('Falha ao baixar CSV do Dashboard');
         const csv = await resp.text();
         const data = parseCSV(csv);
@@ -1610,7 +1780,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const loading = document.getElementById('loadingMsg'); if (loading) loading.style.display='none';
     }
 
-    return { init() { bindUI(); initData().then(()=>renderAll()); } };
+    return { init() { bindUI(); initData().then(()=>renderAll()); if (window.GamificationModule) { window.GamificationModule.initialize(); } } };
   })();
 
   // Inicialização do App
