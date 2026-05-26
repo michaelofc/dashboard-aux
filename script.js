@@ -1424,9 +1424,21 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         fillFilters(); await loadAuxSheet(); document.getElementById('loadingMsg').style.display='none'; processVencimentoData(); setTimeout(()=>updateDashboard(),100);
       } catch (e) { 
         console.error('❌ Erro ao carregar dados:', e);
+        // Usar dados de teste quando há erro
+        rawData = [
+          { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, contrato:'C1', telefone:'', dataVenda:new Date(2025,1,1) },
+          { ata:'mar./25', ano:'2025', status:'ATRASADO', vencimento:'20', equipe:'EQUIPE A', vendedor:'B', cliente:'Y', valor:45000, contrato:'C2', telefone:'', dataVenda:new Date(2025,2,1) },
+          { ata:'abr./25', ano:'2025', status:'CANCELADO', vencimento:'25', equipe:'EQUIPE B', vendedor:'C', cliente:'Z', valor:60000, contrato:'C3', telefone:'', dataVenda:new Date(2025,3,1) }
+        ];
+        uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        fillFilters(); 
+        await loadAuxSheet(); 
+        processVencimentoData(); 
+        setTimeout(()=>updateDashboard(),100);
         document.getElementById('loadingMsg').innerHTML = `
-          <div style="color: #ef4444; padding: 16px; background: #fee2e2; border-radius: 8px; margin: 12px 0;">
-            <strong>⚠️ Erro ao carregar planilha:</strong><br>
+          <div style="color: #f59e0b; padding: 16px; background: #fef3c7; border-radius: 8px; margin: 12px 0;">
+            <strong>⚠️ Erro ao carregar planilha real:</strong><br>
             ${e.message}<br><br>
             <small>Verifique:
               <ul style="margin: 8px 0; padding-left: 20px;">
@@ -1434,6 +1446,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
                 <li>Planilha está publicada em "Publicar na web"?</li>
                 <li>Backend está respondendo em /api/sheet?</li>
               </ul>
+              <strong>Usando dados de teste para visualizar o dashboard com a meta do admin panel.</strong>
             </small>
           </div>
         `;
