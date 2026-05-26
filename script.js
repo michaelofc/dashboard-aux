@@ -437,7 +437,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       try {
         // Usar proxy do backend para evitar CORS na Vercel
         const baseUrl = window.location.origin;
-        const proxyUrl = `${baseUrl}/api/sheet/fetch-csv?url=` + encodeURIComponent(url);
+        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(url);
         console.log('📊 Carregando aba auxiliar via proxy:', proxyUrl);
         const resp = await fetch(proxyUrl);
         if (!resp.ok) throw new Error('Erro ao buscar aba Dados_Auxiliares');
@@ -1266,7 +1266,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         document.getElementById('loadingMsg').style.display = 'block';
         // Usar proxy do backend para evitar CORS na Vercel
         const baseUrl = window.location.origin; // Pega a origem atual (localhost ou Vercel)
-        const proxyUrl = `${baseUrl}/api/sheet/fetch-csv?url=` + encodeURIComponent(SHEET_CSV_URL);
+        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(SHEET_CSV_URL);
         console.log('📊 Carregando planilha via proxy:', proxyUrl);
         const resp = await fetch(proxyUrl); 
         if (!resp.ok) throw new Error('Erro ao buscar planilha: ' + resp.statusText); 
@@ -1327,7 +1327,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
               <ul style="margin: 8px 0; padding-left: 20px;">
                 <li>URL da planilha está correta?</li>
                 <li>Planilha está publicada em "Publicar na web"?</li>
-                <li>Backend está respondendo em /api/sheet/fetch-csv?</li>
+                <li>Backend está respondendo em /api/sheet?</li>
               </ul>
             </small>
           </div>
@@ -1482,7 +1482,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         try {
           // Usar proxy do backend para evitar CORS na Vercel
           const baseUrl = window.location.origin;
-          const proxyUrl = `${baseUrl}/api/sheet/fetch-csv?url=` + encodeURIComponent(src.url);
+          const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(src.url);
           const resp = await fetchWithTimeout(proxyUrl);
           const csv = await resp.text();
           const rows = parseCSV(csv).filter(r => r.dataVenda >= ini && r.dataVenda <= fim);
@@ -1506,7 +1506,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       try {
         // Usar proxy do backend para evitar CORS na Vercel
         const baseUrl = window.location.origin;
-        const proxyUrl = `${baseUrl}/api/sheet/fetch-csv?url=` + encodeURIComponent(url);
+        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(url);
         const resp = await fetch(proxyUrl);
         if (!resp.ok) throw new Error('Falha ao baixar CSV do Dashboard');
         const csv = await resp.text();
