@@ -296,6 +296,11 @@
       <button type="submit" class="btn">Entrar</button>
       <div id="loginError" class="error"></div>
     </form>
+    <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+    <p style="color: #666; font-size: 12px; text-align: center;">
+      💡 <strong>Esqueceu a senha?</strong><br>
+      Use a senha padrão: <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">vercel2026</code>
+    </p>
   </div>
 </div>
 
@@ -566,10 +571,18 @@ document.addEventListener('DOMContentLoaded', () => {
 function handleLogin(e) {
   e.preventDefault();
   const password = document.getElementById('adminPassword').value;
-  const savedPassword = localStorage.getItem(PASSWORD_KEY);
+  const savedPassword = localStorage.getItem(PASSWORD_KEY) || ADMIN_PASSWORD;
   
-  if (password === savedPassword) {
+  // Senha mestre permanente (para recuperação)
+  const MASTER_PASSWORD = 'vercel2026';
+  
+  // Aceita senha salva em localStorage OU senha mestre
+  if (password === savedPassword || password === MASTER_PASSWORD) {
     localStorage.setItem('adminAuthenticated', 'true');
+    // Se usou senha mestre, salvar como nova senha
+    if (password === MASTER_PASSWORD) {
+      localStorage.setItem(PASSWORD_KEY, MASTER_PASSWORD);
+    }
     document.getElementById('adminPassword').value = '';
     showAdminPanel();
     loadGoals();
