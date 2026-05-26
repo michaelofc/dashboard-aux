@@ -335,30 +335,55 @@
 
         <div>
           <label>Período</label>
-          <select id="period">
+          <select id="period" onchange="updatePeriodDisplay()">
             <option value="mensal">Mensal</option>
             <option value="trimestral">Trimestral</option>
             <option value="semestral">Semestral</option>
+            <option value="período 8-2">Período 8-2 (6 meses)</option>
             <option value="anual">Anual</option>
           </select>
         </div>
 
+        <div id="monthReferenceDiv" style="display: none;">
+          <label>Mês de Referência (para período 8-2)</label>
+          <select id="monthReference" onchange="updatePeriodo82()">
+            <option value="">-- Selecione o mês --</option>
+            <option value="02">Fevereiro (8-2)</option>
+            <option value="03">Março (9-3)</option>
+            <option value="04">Abril (10-4)</option>
+            <option value="05">Maio (11-5)</option>
+            <option value="06">Junho (12-6)</option>
+            <option value="07">Julho (01-7)</option>
+            <option value="08">Agosto (02-8)</option>
+            <option value="09">Setembro (03-9)</option>
+            <option value="10">Outubro (04-10)</option>
+            <option value="11">Novembro (05-11)</option>
+            <option value="12">Dezembro (06-12)</option>
+          </select>
+        </div>
+
+        <div id="periodo82DisplayDiv" style="display: none; padding: 12px; background: #f0f9ff; border-left: 4px solid #0284c7; border-radius: 4px;">
+          <label style="color: #0c4a6e; font-weight: 600;">Período Calculado 8-2</label>
+          <p style="color: #0c4a6e; margin-top: 8px;"><span id="periodo82Display"></span></p>
+        </div>
+
         <div>
-          <label>Meta (Valor em R$)</label>
-          <input type="number" id="targetValue" min="0" step="1000" placeholder="100000">
+          <label>Redução de Inadimplência (%)</label>
+          <input type="number" id="targetValue" min="0" max="100" step="0.1" placeholder="3.0" value="0">
+          <small style="color: #666; display: block; margin-top: 4px;">Exemplo: 3 para reduzir 3% da inadimplência</small>
         </div>
 
         <div>
           <label>Descrição</label>
-          <input type="text" id="description" placeholder="Ex: Vendas de contratos">
+          <input type="text" id="description" placeholder="Ex: Redução de inadimplência">
         </div>
 
-        <div>
+        <div id="startDateDiv">
           <label>Data de Início</label>
           <input type="date" id="startDate">
         </div>
 
-        <div>
+        <div id="endDateDiv">
           <label>Data de Término</label>
           <input type="date" id="endDate">
         </div>
@@ -393,7 +418,7 @@
           <tr>
             <th>Tipo</th>
             <th>Escopo</th>
-            <th>Meta (R$)</th>
+            <th>Redução de Inadimplência (%)</th>
             <th>Período</th>
             <th>Descrição</th>
             <th>Data Início</th>
@@ -512,6 +537,65 @@ function updateGoalForm() {
     label.textContent = 'Diretoria';
     document.getElementById('scope').placeholder = 'Ex: Vendas, Operações';
   }
+
+  // Atualizar período para mostrar/esconder 8-2
+  updatePeriodDisplay();
+}
+
+function updatePeriodDisplay() {
+  const period = document.getElementById('period').value;
+  const monthRefDiv = document.getElementById('monthReferenceDiv');
+  const periodo82DisplayDiv = document.getElementById('periodo82DisplayDiv');
+  const startDateDiv = document.getElementById('startDateDiv');
+  const endDateDiv = document.getElementById('endDateDiv');
+
+  if (period === 'período 8-2') {
+    monthRefDiv.style.display = 'block';
+    periodo82DisplayDiv.style.display = 'block';
+    startDateDiv.style.display = 'none';
+    endDateDiv.style.display = 'none';
+  } else {
+    monthRefDiv.style.display = 'none';
+    periodo82DisplayDiv.style.display = 'none';
+    startDateDiv.style.display = 'block';
+    endDateDiv.style.display = 'block';
+  }
+}
+
+function updatePeriodo82() {
+  const monthRef = document.getElementById('monthReference').value;
+  if (!monthRef) return;
+
+  // Calcular período 8-2 baseado no mês de referência
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = parseInt(monthRef);
+
+  // Se o mês é menor que o mês atual, provavelmente é do próximo ano
+  // Mas se é mês de referência (tipo fevereiro para 8-2), mantém o ano
+  
+  const refDate = new Date(year, month - 1, 1);
+  let fim = new Date(refDate.getFullYear(), refDate.getMonth(), 0); // Último dia do mês
+  let iniMes = fim.getMonth() - 5;
+  let iniAno = fim.getFullYear();
+  while (iniMes < 0) { iniMes += 12; iniAno -= 1; }
+  let ini = new Date(iniAno, iniMes, 1);
+
+  // Atualizar campos de data
+  document.getElementById('startDate').value = formatDateISO(ini);
+  document.getElementById('endDate').value = formatDateISO(fim);
+
+  // Mostrar período calculado
+  const meses = ['', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const display = `${String(ini.getDate()).padStart(2,'0')}/${meses[ini.getMonth()+1]} a ${String(fim.getDate()).padStart(2,'0')}/${meses[fim.getMonth()+1]}`;
+  document.getElementById('periodo82Display').textContent = display;
+}
+
+function formatDateISO(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function createGoal() {
@@ -586,7 +670,7 @@ function loadGoals() {
     <tr>
       <td><span class="level-badge">${goal.type}</span></td>
       <td><strong>${goal.scope}</strong></td>
-      <td>R$ ${goal.targetValue.toLocaleString('pt-BR')}</td>
+      <td>${goal.targetValue.toFixed(2)}%</td>
       <td>${goal.period}</td>
       <td>${goal.description}</td>
       <td>${new Date(goal.startDate).toLocaleDateString('pt-BR')}</td>
