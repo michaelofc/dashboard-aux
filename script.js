@@ -1050,7 +1050,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           }
           
           // Se ainda não encontrou, usar primeira meta do admin panel como fallback
-          if (!filialToSearch && adminGoals.length > 0) {
+          if ((filialToSearch === 'Geral' || filialToSearch === 'Todas' || !filialToSearch) && adminGoals.length > 0) {
             filialToSearch = adminGoals[0]?.scope;
           }
           
