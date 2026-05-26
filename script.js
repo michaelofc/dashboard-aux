@@ -204,7 +204,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             <div class="metric-value" id="currentInadimplencia">-</div>
             <div class="metric-label">Inadimplência Atual</div>
             <div class="metric-trend slide-container" id="inadimplenciaTrend">
-              <div class="slide-content active" id="slideContent1">Meta: 25% | Status: <span id="metaStatus">-</span></div>
+              <div class="slide-content active" id="slideContent1">Meta: <span id="metaDisplay">25%</span> | Status: <span id="metaStatus">-</span></div>
               <div class="slide-content" id="slideContent2">Diferença: <span id="metaDiferenca">-</span></div>
             </div>
           </div>
@@ -236,7 +236,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
                 <h3 style="margin:0;font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;display:flex;align-items:center;gap:8px;">
                   <i class="fas fa-chart-area" style="-webkit-text-fill-color:#00d4ff;font-size:1.1rem;"></i> Evolução da Inadimplência
                 </h3>
-                <p style="margin:4px 0 0 0;color:#94a3b8;font-size:0.85rem;">Histórico mensal · Meta 25%</p>
+                <p style="margin:4px 0 0 0;color:#94a3b8;font-size:0.85rem;">Histórico mensal · <span id="metaLabel">Meta 25%</span></p>
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button id="toggle6Months" class="evo-toggle active" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.15);color:#00d4ff;font-weight:600;font-size:0.8rem;cursor:pointer;transition:all .3s;">6M</button>
@@ -525,9 +525,11 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
       // Linha de meta apenas para inadimplência
       if (!showingProduction) {
+        // Buscar meta atual do localStorage
+        const currentMetaPercent = window.currentMetaPercent !== undefined ? window.currentMetaPercent : 25;
         datasets.push({
-          label: 'Meta 25%',
-          data: chartData.map(() => 25),
+          label: `Meta ${currentMetaPercent.toFixed(1)}%`,
+          data: chartData.map(() => currentMetaPercent),
           borderColor: '#fbbf24',
           borderWidth: 2,
           borderDash: [8, 4],
@@ -566,7 +568,8 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
               displayColors: true,
               callbacks: {
                 label: (ctx) => {
-                  if (ctx.dataset.label === 'Meta 25%') return 'Meta: 25%';
+                  const currentMetaPercent = window.currentMetaPercent !== undefined ? window.currentMetaPercent : 25;
+                  if (ctx.dataset.label.includes('Meta')) return `Meta: ${currentMetaPercent.toFixed(1)}%`;
                   const val = ctx.parsed.y;
                   let suffix = showingProduction ? ` R$ ${val.toFixed(2)}M` : ` ${val.toFixed(2)}%`;
                   const i = ctx.dataIndex;
@@ -999,6 +1002,39 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (challengeEl) challengeEl.textContent = `Reduzir inadimplência do Dia ${critical.label} para abaixo de 20% nos próximos 3 meses`;
     }
 
+    // Função para buscar a meta do admin panel baseado na filial e período
+    function getMetaFromAdmin(filialName, periodo, dataRef) {
+      try {
+        const adminGoals = JSON.parse(localStorage.getItem('dashboard_goals') || '[]');
+        if (!adminGoals || adminGoals.length === 0) return 0.25; // padrão 25%
+        
+        // Procurar meta correspondente
+        for (const goal of adminGoals) {
+          // Verificar se é individual (filial) e tem nome correspondente
+          if (goal.type === 'Individual (Por Filial)' && goal.scope) {
+            const goalFilial = goal.scope.toLowerCase().trim();
+            const currentFilial = filialName.toLowerCase().trim();
+            
+            // Se encontrou filial correspondente
+            if (goalFilial === currentFilial || currentFilial.includes(goalFilial) || goalFilial.includes(currentFilial)) {
+              // Verificar se está dentro do período da meta
+              if (goal.startDate && goal.endDate && dataRef) {
+                const metaIni = new Date(goal.startDate);
+                const metaFim = new Date(goal.endDate);
+                if (dataRef >= metaIni && dataRef <= metaFim) {
+                  // Retornar como decimal (ex: 0.15 para 15%)
+                  return (goal.targetInadempl || 25) / 100;
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao buscar meta do admin:', e);
+      }
+      return 0.25; // padrão 25%
+    }
+
     function updateDashboard() {
   // Se a view do Dashboard não está montada, não atualiza DOM
   if (!document.getElementById('dashboard-container')) return;
@@ -1026,12 +1062,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const totalAtrasadoProj = dataProj.filter(r=>r.status==='ATRASADO').reduce((acc,r)=>acc+r.valor,0);
       const totalCanceladoProj = dataProj.filter(r=>r.status==='CANCELADO').reduce((acc,r)=>acc+r.valor,0);
       const inadimplenciaProj = totalVendasProj ? (totalAtrasadoProj + totalCanceladoProj) / totalVendasProj : 0;
-      const riscoPotencial = totalVendas * inadimplencia; const metaInadimplencia = 0.25; const metaAtingida = inadimplencia <= metaInadimplencia; const diferenciaMeta = Math.abs((inadimplencia - metaInadimplencia) * 100);
+      const riscoPotencial = totalVendas * inadimplencia; const metaInadimplencia = getMetaFromAdmin(team || 'Geral', 'periodo-8-2', dataRef); window.currentMetaPercent = metaInadimplencia * 100; const metaAtingida = inadimplencia <= metaInadimplencia; const diferenciaMeta = Math.abs((inadimplencia - metaInadimplencia) * 100);
       const prevRef = new Date(dataRef.getFullYear(), dataRef.getMonth()-1, 1); const {ini:prevIni, fim:prevFim} = getPeriodo82(prevRef);
       const prevData = rawData.filter(r => r.dataVenda >= prevIni && r.dataVenda <= prevFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
       const prevVendas = prevData.reduce((acc,r)=>acc+r.valor,0);
   const currInadEl = document.getElementById('currentInadimplencia'); if (currInadEl) currInadEl.textContent = formatPercent(inadimplencia);
       const metaStatusEl = document.getElementById('metaStatus'); const metaDiferencaEl = document.getElementById('metaDiferenca');
+      const metaDisplayEl = document.getElementById('metaDisplay'); if (metaDisplayEl) metaDisplayEl.textContent = (metaInadimplencia * 100).toFixed(1) + '%';
+      const metaLabelEl = document.getElementById('metaLabel'); if (metaLabelEl) metaLabelEl.textContent = `Meta ${(metaInadimplencia * 100).toFixed(1)}%`;
       if (metaStatusEl) metaStatusEl.textContent = metaAtingida ? 'ATINGIDA ✅' : 'NÃO ATINGIDA ❌';
       if (metaDiferencaEl) metaDiferencaEl.textContent = metaAtingida ? `${diferenciaMeta.toFixed(1)}pp abaixo da meta` : `${diferenciaMeta.toFixed(1)}pp acima da meta`;
       setTimeout(()=>initMetricSlide(), 100);
