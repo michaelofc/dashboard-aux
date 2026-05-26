@@ -1008,15 +1008,53 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         const adminGoals = JSON.parse(localStorage.getItem('dashboard_goals') || '[]');
         if (!adminGoals || adminGoals.length === 0) return 0.25; // padrão 25%
         
+        // Obter URL atual da planilha armazenada
+        const currentSheetUrl = localStorage.getItem('sheetUrl') || '';
+        
         // Determinar qual filial procurar
         let filialToSearch = selectedTeam;
         if (!filialToSearch || filialToSearch === 'Todas' || filialToSearch === 'Geral') {
-          // Se nenhuma equipe selecionada, procurar a primeira equipe dos dados
-          if (uniqueTeams && uniqueTeams.length > 0) {
-            filialToSearch = uniqueTeams[0];
-          } else {
-            return 0.25; // padrão
+          // Se nenhuma equipe selecionada, procurar pela URL da planilha
+          // Isso é útil quando o dashboard é aberto com um link específico de filial
+          if (currentSheetUrl) {
+            // Encontrar filial correspondente à URL
+            const Gamificacao_sources_check = [
+              { nome: 'Santo André', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ3ToD7PGSzSsse2PknRNR1vBzirmngf3g1nbWz9XFGP1_1viVrs0m95zGfS1PiyG2WSKTIIS1xOVHS' },
+              { nome: 'São Bernardo do Campo', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRdwCZkmISaGAnFqd9MUdQ7OFlakL0iNQ9v-PMYZirR-W-2s4j_28VuntHG6sYIR1qyqij46LWMsLoA' },
+              { nome: 'Guarulhos', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQxYB0l4MSyo7K0xhYmikEXMt5i6DlWMz4B2XYrglNjSpbSyQIOxpB5kkAqIkQd8kXqQCusZ5AfXuC5' },
+              { nome: 'Araçatuba', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0MTiQ1nXBI8HOg3yRVMYacBHXEI7MlBRhzaX52szMllKHdxVlAxE3A8gA5ZDPnFO-yEGDef86QGE0' },
+              { nome: 'Ipiranga', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT0NjAK33_Q655P-WuhIjV2G_K3q7uzPXc6PFUnnhonWtu7dWVGJrpO_QP_5mfjRgLTbPnAoyvfOZVB' },
+              { nome: 'Mauá', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT1NRT6j0uGUuErHRI1jmYd7Hhtq45XYHjWQtSI384MHMnNHx9j4rKglUR-wkbYN1AJv1eL-7yZgDL2' },
+              { nome: 'Mooca', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQavRu_jHblojklrRajiMR7XGpC0dE2M589LZ00UBaDskg3EZIOoj7n4jLCgE-2ODmZktjP_zSb15ND' },
+              { nome: 'Santos', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR2ECOHv5SVmxCCZ7ffbxLDb6DY7LKBGg9AuPtoSDZDbBcpni5voiLRAZDvsOUyfqcZ3OSuKgx1J33c' },
+              { nome: 'Santo Amaro', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR6-oGCysRnFKZWIVbgHtnSv0qRGDTrQ6cprekhfSJDOAwYu2AdAXmgGJiMAlOvL6K5QS053SeZbqg7' },
+              { nome: 'São José dos Campos', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRR_zNtuNCA492DfdbNihCFowj8U43HwyNpD6E-e_XDl7-49nkc9Hska9BzH0e1pNopxVdPsbGi1Wwb' },
+              { nome: 'Sorocaba', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRDhQ3IediDw10_VuSCTbt1YLqShu0749nIM2Y5HXaZPrAF9eBV09yPXpkJB-2UYNrJn9ZtSUPozoBB' },
+              { nome: 'Suzano', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vST4hKhXoz_NGRRUp6aoHr_VGJgQEIVaz3KSVq9KC1riglgNA3HPEOVAQLGFQRLGEFfFHS9xbg0oFoe' },
+              { nome: 'Taubaté', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS7RU4Lh1pWXQefdjavaqG8MjUdMRY6N-5a5bp01z5zycuwxCDVS5Gnt2A6kOrjT2Z9DHJ1NjbZrrqt' },
+              { nome: 'Americana', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQf0kasU6lnx3CT-HjX_OjOU9UOUnJvGlyOJrVC8zA1L-e5ERtaGffz9X7uFSii0HJIpcfxbNnLEvyG' },
+              { nome: 'São José do Rio Preto', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSyCeUtbXYUohS_DRzQnGKC_GdngP0sJISubh7ncWTKMOepSzYCBTFHdqW-FaQs67sMKsR9aOJFj2Lm' },
+              { nome: 'Valinhos', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT2t1URWDYKT_fpwsrr-E5japQLeBVkwjSZ-nxkjUQVQrhdPxzgtdH9EAyU4VN8YTBgIr7hOV3I7gCZ' },
+              { nome: 'Tatuapé', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTX_srLQozewsTh6l2LAf5UZKp3sqRuJPO7ORpuh4xssYxNxq4pHFR-yqG3yxS4mwacM0IfFtxRPaUY' },
+              { nome: 'Piracicaba', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQfet93n1XunJ6BRh3vumZ1jpaD_o-wm4WL6mEnpYK2uvqjT9D2AmJ0n_JgXq5Z99dRLJBBjoMwaXB2' },
+              { nome: 'Bauru', url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQUZpK5Ix7w-a9Tp1Y0DTlJqIbgtiJJ9jnBzuuvpeoAjhrWgPzOiGhX-7gEXsI_ygqeQcxeFRgN5wlM' }
+            ];
+            
+            for (const filial of Gamificacao_sources_check) {
+              if (currentSheetUrl.includes(filial.url) || filial.url.includes(currentSheetUrl.split('/')[5])) {
+                filialToSearch = filial.nome;
+                console.log(`🔗 Filial identificada pela URL: ${filialToSearch}`);
+                break;
+              }
+            }
           }
+          
+          // Se ainda não encontrou, usar primeira equipe
+          if (!filialToSearch && uniqueTeams && uniqueTeams.length > 0) {
+            filialToSearch = uniqueTeams[0];
+          }
+          
+          if (!filialToSearch) return 0.25;
         }
         
         // Procurar meta correspondente
