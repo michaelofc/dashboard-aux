@@ -134,6 +134,27 @@
       background: #b91c1c;
     }
 
+    .admin-header-buttons {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn-back-dashboard {
+      background: #10b981;
+      padding: 10px 20px;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.3s;
+    }
+
+    .btn-back-dashboard:hover {
+      background: #059669;
+    }
+
     .tabs {
       display: flex;
       gap: 10px;
@@ -310,7 +331,10 @@
 <div id="adminContainer" class="admin-container">
   <div class="admin-header">
     <h1>📊 Painel de Metas</h1>
-    <button class="btn-logout" onclick="logout()">Sair</button>
+    <div class="admin-header-buttons">
+      <button class="btn-back-dashboard" onclick="goToDashboard()">← Voltar para Dashboard</button>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -647,6 +671,10 @@ function logout() {
   document.getElementById('adminContainer').classList.remove('active');
   document.getElementById('loginContainer').style.display = 'flex';
   document.getElementById('adminPassword').value = '';
+}
+
+function goToDashboard() {
+  window.location.href = './index.html';
 }
 
 function showAdminPanel() {
