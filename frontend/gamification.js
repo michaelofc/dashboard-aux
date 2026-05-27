@@ -142,9 +142,6 @@ const GamificationModule = (() => {
       const selectedRegional = document.getElementById('teamFilter')?.value || '';
       
       if (adminGoals.length > 0) {
-        // Atualizar as opções do seletor com as filiais das metas
-        updateRegionalFilterOptions(adminGoals);
-        
         // Filtrar metas por filial: apenas mostrar metas da filial selecionada
         let filteredGoals = adminGoals;
         if (selectedRegional) {
@@ -204,49 +201,7 @@ const GamificationModule = (() => {
     }
   }
 
-  /**
-   * Atualizar as opções do seletor de Regional com as filiais das metas
-   */
-  function updateRegionalFilterOptions(adminGoals) {
-    const selectElement = document.getElementById('teamFilter');
-    if (!selectElement) return;
 
-    // Extrair filiais únicas das metas
-    const filiais = [...new Set(adminGoals.map(goal => goal.scope).filter(Boolean))];
-    
-    console.log('📍 Filiais encontradas nas metas:', filiais);
-
-    // Preservar a opção "Todos/Todas"
-    const currentOptions = Array.from(selectElement.options).map(opt => ({ 
-      value: opt.value, 
-      text: opt.text 
-    }));
-    
-    // Se a primeira opção é "Todos" ou "Todas", mantê-la
-    let allOption = currentOptions.find(opt => opt.text === 'Todos' || opt.text === 'Todas');
-    if (!allOption) {
-      allOption = { value: '', text: 'Todos' };
-    }
-
-    // Limpar opções except the "Todos"
-    selectElement.innerHTML = '';
-
-    // Adicionar opção "Todos"
-    const todosOpt = document.createElement('option');
-    todosOpt.value = '';
-    todosOpt.text = 'Todos';
-    selectElement.appendChild(todosOpt);
-
-    // Adicionar opções de filiais que têm metas
-    filiais.forEach(filial => {
-      const opt = document.createElement('option');
-      opt.value = filial;
-      opt.text = filial;
-      selectElement.appendChild(opt);
-    });
-
-    console.log('✅ Opções do filtro atualizadas');
-  }
 
   /**
    * Carregar dados de gamificação
