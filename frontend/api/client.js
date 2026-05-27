@@ -294,41 +294,6 @@ class ApiClient {
   // ===== EXPORTAÇÃO =====
 
   /**
-   * Exportar dados em Excel
-   */
-  async exportToExcel(filters = {}) {
-    try {
-      const response = await fetch(`${this.apiBaseURL}/export/excel`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getToken()}`
-        },
-        body: JSON.stringify(filters)
-      });
-
-      if (!response.ok) {
-        throw new Error('Erro ao exportar Excel');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `inadimplencia_${new Date().getTime()}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      return { success: true };
-    } catch (error) {
-      console.error('Erro ao exportar Excel:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Exportar dados em PDF
    */
   async exportToPDF(filters = {}) {

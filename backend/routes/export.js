@@ -2,7 +2,6 @@
 // Endpoints para exportar dados em Excel e PDF
 
 import express from 'express';
-import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { getDatabase } from '../db/connection.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -99,121 +98,6 @@ async function getDashboardData(filters = {}) {
 }
 
 // ===== ENDPOINTS =====
-
-/**
- * POST /export/excel
- * Exporta dados em Excel com formatação profissional
- */
-router.post('/excel', async (req, res) => {
-  try {
-    const { periodo, equipe, vendedor, status } = req.body;
-
-    // Buscar dados
-    const data = await getDashboardData({
-      periodo,
-      equipe,
-      vendedor,
-      status,
-    });
-
-    if (data.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Nenhum dado encontrado para os filtros selecionados',
-      });
-    }
-
-    // Criar workbook
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Inadimplência');
-
-    // Configurar colunas
-    worksheet.columns = [
-      { header: 'Período', key: 'periodo', width: 15 },
-      { header: 'Filial', key: 'filial', width: 12 },
-      { header: 'Equipe', key: 'equipe', width: 15 },
-      { header: 'Vendedor', key: 'vendedor', width: 20 },
-      { header: 'Status', key: 'status', width: 12 },
-      { header: 'Valor Inadimplência', key: 'valor_inad', width: 18 },
-      { header: 'Data Registro', key: 'created_at', width: 15 },
-    ];
-
-    // Estilizar cabeçalho
-    const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1F4E78' },
-    };
-    headerRow.alignment = { horizontal: 'center', vertical: 'center' };
-
-    // Adicionar dados com formatação
-    data.forEach((row) => {
-      const dataRow = worksheet.addRow({
-        periodo: row.periodo,
-        filial: row.filial,
-        equipe: row.equipe,
-        vendedor: row.vendedor,
-        status: row.status,
-        valor_inad: row.valor_inad,
-        created_at: formatDate(row.created_at),
-      });
-
-      // Formatar coluna de valor
-      dataRow.getCell('valor_inad').numFmt = '[R$-pt-BR] #,##0.00';
-      dataRow.getCell('valor_inad').alignment = { horizontal: 'right' };
-
-      // Colorir status
-      const statusCell = dataRow.getCell('status');
-      if (row.status === 'Atrasado') {
-        statusCell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFFF6B6B' },
-        };
-      } else if (row.status === 'Cancelado') {
-        statusCell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FF94E1D5' },
-        };
-      }
-    });
-
-    // Adicionar totalizações
-    const totalRow = worksheet.addRow([]);
-    totalRow.getCell(1).value = 'TOTAL';
-    totalRow.getCell(1).font = { bold: true };
-    totalRow.getCell(6).value = `=SUM(F2:F${data.length + 1})`;
-    totalRow.getCell(6).font = { bold: true };
-    totalRow.getCell(6).numFmt = '[R$-pt-BR] #,##0.00';
-
-    // Congelar primeira linha
-    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
-
-    // Gerar buffer
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    // Enviar resposta
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="inadimplencia_${new Date().getTime()}.xlsx"`
-    );
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    );
-    res.send(buffer);
-  } catch (error) {
-    console.error('Erro ao exportar Excel:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erro ao gerar arquivo Excel',
-      error: error.message,
-    });
-  }
-});
 
 /**
  * POST /export/pdf

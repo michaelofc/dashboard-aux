@@ -193,7 +193,6 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             </select>
           </div>
           <button id="btnExportPdf" class="tab-btn" style="background:#64748b;color:#fff;border:none;">Imprimir / PDF</button>
-          <button id="btnExportExcel" class="tab-btn" style="background:#10b981;color:#fff;border:none;">📊 Excel</button>
           <button id="btnExportPdfApi" class="tab-btn" style="background:#f59e0b;color:#fff;border:none;">📄 PDF</button>
           <button id="refreshBtn" class="tab-btn" style="background:#e9bc29;color:#000;border:none;">Atualizar Dados</button>
         </div>
@@ -815,126 +814,6 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
     // ===== EXPORTAÇÃO VIA API =====
 
-    async function exportToExcel() {
-      try {
-        const btnExcel = document.getElementById('btnExportExcel');
-        btnExcel.disabled = true;
-        btnExcel.textContent = '⏳ Gerando...';
-
-        // Coletar filtros
-        const periodo = document.getElementById('monthSelect')?.value || '';
-        const equipe = document.getElementById('teamFilter')?.value || '';
-        const vendedor = document.getElementById('vendedorFilter')?.value || '';
-        const status = document.getElementById('statusFilter')?.value || '';
-
-        // Preparar payload
-        const payload = {};
-        if (periodo) payload.periodo = periodo;
-        if (equipe) payload.equipe = equipe;
-        if (vendedor) payload.vendedor = vendedor;
-        if (status) payload.status = status;
-
-        // Obter token do localStorage
-        let token = localStorage.getItem('authToken');
-        if (!token) {
-          alert('❌ Você não está autenticado. Faça login novamente.');
-          window.location.href = '/login.html';
-          return;
-        }
-
-        // Definir URL da API
-        const API_BASE = window.API_URL || 
-          (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : `${window.location.origin}/api`);
-
-        // Tentar fazer requisição
-        let response = await fetch(`${API_BASE}/export/excel`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        // Se token expirou (401), tentar renovar
-        if (response.status === 401) {
-          console.log('Token expirado, tentando renovar...');
-          try {
-            const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: '{}'
-            });
-
-            if (refreshResponse.ok) {
-              const refreshData = await refreshResponse.json();
-              token = refreshData.token;
-              localStorage.setItem('authToken', token);
-              
-              // Tentar novamente com novo token
-              response = await fetch(`${API_BASE}/export/excel`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-              });
-            } else {
-              throw new Error('Sessão expirada. Faça login novamente.');
-            }
-          } catch (refreshError) {
-            console.error('Erro ao renovar token:', refreshError);
-            alert('❌ Sua sessão expirou. Faça login novamente.');
-            window.location.href = '/login.html';
-            return;
-          }
-        }
-
-        if (!response.ok) {
-          let errorMessage = 'Erro ao gerar Excel';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorData.error || errorMessage;
-          } catch (e) {
-            errorMessage = `Erro HTTP ${response.status}`;
-          }
-          throw new Error(errorMessage);
-        }
-
-        // Receber arquivo como blob
-        const blob = await response.blob();
-
-        // Validar se é um arquivo válido
-        if (blob.size === 0) {
-          throw new Error('Arquivo vazio recebido do servidor');
-        }
-
-        // Criar link e fazer download
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `inadimplencia_${new Date().getTime()}.xlsx`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        alert('✅ Excel exportado com sucesso!');
-      } catch (error) {
-        console.error('Erro ao exportar Excel:', error);
-        alert(`❌ Erro ao exportar Excel: ${error.message}`);
-      } finally {
-        const btnExcel = document.getElementById('btnExportExcel');
-        btnExcel.disabled = false;
-        btnExcel.textContent = '📊 Excel';
-      }
-    }
-
     function exportToPdfApi() {
       try {
         // Usar função existente de export PDF
@@ -1403,8 +1282,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
   if (refreshBtn) refreshBtn.onclick = async () => { try { refreshBtn.disabled = true; refreshBtn.textContent = 'Atualizando...'; await loadSheetData(); } finally { refreshBtn.disabled = false; refreshBtn.textContent = 'Atualizar Dados'; } };
   const btnPdf = document.getElementById('btnExportPdf');
   if (btnPdf) btnPdf.addEventListener('click', exportInadReportPdf);
-  const btnExcel = document.getElementById('btnExportExcel');
-  if (btnExcel) btnExcel.addEventListener('click', exportToExcel);
+
   const btnPdfApi = document.getElementById('btnExportPdfApi');
   if (btnPdfApi) btnPdfApi.addEventListener('click', exportToPdfApi);
       const toggle6 = document.getElementById('toggle6Months'); const toggle12 = document.getElementById('toggle12Months'); const toggleProd = document.getElementById('toggleProduction');
