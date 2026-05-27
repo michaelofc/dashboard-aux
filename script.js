@@ -1251,23 +1251,28 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
       if (!ranking.length) { podiumEl.innerHTML = ''; listEl.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Sem dados de vendedores no período</div>'; return; }
 
-      // MINIMALISTA: Tabela simples sem cards grandes
+      // MINIMALISTA: Grid 2 colunas compacto
       podiumEl.innerHTML = '';
-      listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:0;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden;">' + 
+      listEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' + 
         ranking.map((t, i) => {
           const pos = i + 1;
           const isZero = t.producao === 0;
           const medalIcon = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '';
           const inadPerc = isZero ? '-' : (t.inad * 100).toFixed(1);
           const inadColor = isZero ? '#475569' : (t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5');
-          const rowBg = i % 2 === 0 ? 'rgba(255,255,255,.02)' : 'rgba(0,0,0,.1)';
+          const bgColor = isZero ? 'rgba(71,85,105,.08)' : 'rgba(255,255,255,.04)';
+          const borderColor = isZero ? 'rgba(71,85,105,.2)' : 'rgba(255,255,255,.1)';
           return `
-            <div style="display:grid;grid-template-columns:40px 1fr 80px 100px 120px;gap:12px;align-items:center;padding:12px 16px;background:${rowBg};border-bottom:${i < ranking.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none'};transition:background .2s;${isZero ? 'opacity:.6;' : ''}">
-              <div style="text-align:center;font-weight:800;color:#94a3b8;font-size:0.9rem;">${medalIcon || pos}º</div>
-              <div style="font-weight:600;color:#e2e8f0;font-size:0.95rem;">${t.nome}</div>
-              <div style="font-size:0.8rem;color:#94a3b8;text-align:center;">${t.equipe}</div>
-              <div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${inadColor};font-size:0.95rem;text-align:right;">${inadPerc}${isZero ? '' : '%'}</div>
-              <div style="font-size:0.85rem;color:#94a3b8;text-align:right;">${formatCurrency(t.producao)}</div>
+            <div style="display:flex;flex-direction:column;gap:6px;border:1px solid ${borderColor};border-radius:8px;padding:8px 10px;background:${bgColor};transition:all .2s;${isZero ? 'opacity:.7;' : ''}"
+                 onmouseenter="this.style.background='${isZero ? 'rgba(71,85,105,.12)' : 'rgba(255,255,255,.08)'}'" onmouseleave="this.style.background='${bgColor}'">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
+                <div style="font-weight:700;color:#e2e8f0;font-size:0.9rem;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${medalIcon} ${t.nome}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${inadColor};font-size:0.85rem;flex-shrink:0;">${inadPerc}${isZero ? '' : '%'}</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:0.75rem;">
+                <div style="color:#64748b;">${t.equipe}</div>
+                <div style="color:#94a3b8;text-align:right;">${formatCurrency(t.producao)}</div>
+              </div>
             </div>`;
         }).join('') + '</div>';
     }
