@@ -5,20 +5,24 @@
 // Lista de filiais disponíveis
 const FILIAIS = [
   'Santo André',
-  'São Paulo',
-  'Campinas',
+  'São Bernardo do Campo',
+  'Guarulhos',
+  'Araçatuba',
+  'Ipiranga',
+  'Mauá',
+  'Mooca',
+  'Santos',
+  'Santo Amaro',
+  'São José dos Campos',
   'Sorocaba',
-  'Ribeirão Preto',
-  'Curitiba',
-  'Brasília',
-  'Belo Horizonte',
-  'Rio de Janeiro',
-  'Salvador',
-  'Fortaleza',
-  'Manaus',
-  'Recife',
-  'Porto Alegre',
-  'Goiânia'
+  'Suzano',
+  'Taubaté',
+  'Americana',
+  'São José do Rio Preto',
+  'Valinhos',
+  'Tatuapé',
+  'Piracicaba',
+  'Bauru'
 ];
 
 // Configurações do painel admin
