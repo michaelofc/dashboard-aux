@@ -129,9 +129,10 @@ const GamificationModule = (() => {
         // Converter metas do admin para formato de gamificação
         gamificationData.goals = adminGoals.map(goal => ({
           id: goal.id,
-          tipo: goal.description || goal.scope,
-          meta: goal.targetValue,
-          alcancado: goal.currentValue || 0,
+          tipo: goal.scope,
+          description: goal.description,
+          meta: goal.targetInadempl || goal.targetValue || 0,
+          alcancado: goal.currentInadempl || goal.currentValue || 0,
           scope: goal.scope,
           type: goal.type,
           period: goal.period,
