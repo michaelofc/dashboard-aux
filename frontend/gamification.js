@@ -232,8 +232,11 @@ const GamificationModule = (() => {
 
         return `
           <div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid ${atingiu ? '#10b981' : '#3b82f6'};">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-              <span style="font-weight: 600; color: #333;">${goal.tipo}</span>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <div>
+                <span style="font-weight: 600; color: #333;">${goal.tipo}</span>
+                ${goal.description ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${goal.description}</div>` : ''}
+              </div>
               <span style="font-size: 12px; color: #666;">${goal.alcancado.toLocaleString()} / ${goal.meta.toLocaleString()}</span>
             </div>
             <div style="width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
