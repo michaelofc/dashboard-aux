@@ -828,20 +828,17 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         const status = document.getElementById('statusFilter')?.value || '';
 
         // Preparar payload
-        const payload = {
-          periodo: periodo || undefined,
-          equipe: equipe || undefined,
-          vendedor: vendedor || undefined,
-          status: status || undefined
-        };
-
-        // Remover campos undefined
-        Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+        const payload = {};
+        if (periodo) payload.periodo = periodo;
+        if (equipe) payload.equipe = equipe;
+        if (vendedor) payload.vendedor = vendedor;
+        if (status) payload.status = status;
 
         // Obter token do localStorage
-        const token = localStorage.getItem('authToken');
+        let token = localStorage.getItem('authToken');
         if (!token) {
           alert('❌ Você não está autenticado. Faça login novamente.');
+          window.location.href = '/login.html';
           return;
         }
 
@@ -849,8 +846,8 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         const API_BASE = window.API_URL || 
           (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : `${window.location.origin}/api`);
 
-        // Fazer requisição para a API
-        const response = await fetch(`${API_BASE}/export/excel`, {
+        // Tentar fazer requisição
+        let response = await fetch(`${API_BASE}/export/excel`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -859,13 +856,62 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           body: JSON.stringify(payload)
         });
 
+        // Se token expirou (401), tentar renovar
+        if (response.status === 401) {
+          console.log('Token expirado, tentando renovar...');
+          try {
+            const refreshResponse = await fetch(`${API_BASE}/auth/refresh`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: '{}'
+            });
+
+            if (refreshResponse.ok) {
+              const refreshData = await refreshResponse.json();
+              token = refreshData.token;
+              localStorage.setItem('authToken', token);
+              
+              // Tentar novamente com novo token
+              response = await fetch(`${API_BASE}/export/excel`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+              });
+            } else {
+              throw new Error('Sessão expirada. Faça login novamente.');
+            }
+          } catch (refreshError) {
+            console.error('Erro ao renovar token:', refreshError);
+            alert('❌ Sua sessão expirou. Faça login novamente.');
+            window.location.href = '/login.html';
+            return;
+          }
+        }
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Erro ao gerar Excel');
+          let errorMessage = 'Erro ao gerar Excel';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch (e) {
+            errorMessage = `Erro HTTP ${response.status}`;
+          }
+          throw new Error(errorMessage);
         }
 
         // Receber arquivo como blob
         const blob = await response.blob();
+
+        // Validar se é um arquivo válido
+        if (blob.size === 0) {
+          throw new Error('Arquivo vazio recebido do servidor');
+        }
 
         // Criar link e fazer download
         const url = URL.createObjectURL(blob);
