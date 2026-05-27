@@ -1263,9 +1263,10 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           const bgColor = isZero ? 'rgba(71,85,105,.08)' : 'rgba(255,255,255,.04)';
           const borderColor = isZero ? 'rgba(71,85,105,.2)' : 'rgba(255,255,255,.1)';
           return `
-            <div style="display:flex;flex-direction:column;gap:6px;border:1px solid ${borderColor};border-radius:8px;padding:8px 10px;background:${bgColor};transition:all .2s;${isZero ? 'opacity:.7;' : ''}"
+            <div style="display:flex;flex-direction:column;gap:6px;border:1px solid ${borderColor};border-radius:8px;padding:8px 10px;background:${bgColor};transition:all .2s;position:relative;${isZero ? 'opacity:.7;' : ''}"
                  onmouseenter="this.style.background='${isZero ? 'rgba(71,85,105,.12)' : 'rgba(255,255,255,.08)'}'" onmouseleave="this.style.background='${bgColor}'">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
+              <div style="position:absolute;top:4px;right:6px;font-weight:800;font-size:0.7rem;background:rgba(102,126,234,.2);color:#667eea;padding:2px 6px;border-radius:4px;letter-spacing:0.5px;">${pos}º</div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;padding-right:30px;">
                 <div style="font-weight:700;color:#e2e8f0;font-size:0.9rem;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${medalIcon} ${t.nome}</div>
                 <div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${inadColor};font-size:0.85rem;flex-shrink:0;">${inadPerc}${isZero ? '' : '%'}</div>
               </div>
