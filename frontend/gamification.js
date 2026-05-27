@@ -127,17 +127,30 @@ const GamificationModule = (() => {
       
       if (adminGoals.length > 0) {
         // Converter metas do admin para formato de gamificação
-        gamificationData.goals = adminGoals.map(goal => ({
-          id: goal.id,
-          tipo: goal.scope,
-          description: goal.description,
-          meta: goal.targetInadempl || goal.targetValue || 0,
-          alcancado: goal.currentInadempl || goal.currentValue || 0,
-          scope: goal.scope,
-          type: goal.type,
-          period: goal.period,
-          pointsPerAchievement: goal.pointsPerAchievement || 100
-        }));
+        // Para metas de inadimplência: quanto maior a redução, melhor
+        // targetInadempl é o objetivo (menor inadimplência = melhor)
+        // currentInadempl é o valor atual
+        gamificationData.goals = adminGoals.map(goal => {
+          // Se o objetivo é reduzir inadimplência, o "progresso" é a redução
+          // Ex: Reduzir de 50% para 25% = objetivo é 25% (meta mínima)
+          // Se atual é 40%, progresso = (50-40) = 10% reduzido de 25% necessário = 40% progresso
+          const reductionNeeded = goal.currentInadempl - goal.targetInadempl;
+          const reductionAchieved = goal.currentInadempl - goal.currentInadempl; // Sempre 0 no dia da criação
+          
+          return {
+            id: goal.id,
+            tipo: goal.scope,
+            description: goal.description,
+            meta: reductionNeeded || 100,  // Meta de redução
+            alcancado: reductionAchieved || 0,  // Redução alcançada até agora
+            scope: goal.scope,
+            type: goal.type,
+            period: goal.period,
+            pointsPerAchievement: goal.pointsPerAchievement || 100,
+            currentInadempl: goal.currentInadempl,
+            targetInadempl: goal.targetInadempl
+          };
+        });
         
         // Calcular pontos baseado em metas atingidas
         let pontosGanhos = 0;
