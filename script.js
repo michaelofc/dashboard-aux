@@ -1901,7 +1901,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const loading = document.getElementById('loadingMsg'); if (loading) loading.style.display='none';
     }
 
-    return { init() { bindUI(); initData().then(()=>renderAll()); if (window.GamificationModule) { window.GamificationModule.initialize(); } } };
+    return { init() { bindUI(); initData().then(()=>{ renderAll(); if (window.GamificationModule) { window.GamificationModule.initialize(); } }); } };
   })();
 
   // Inicialização do App
