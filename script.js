@@ -815,56 +815,50 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
     // ===== EXPORTAÇÃO VIA API =====
 
-    async function exportToExcel() {
+    function exportToExcel() {
       try {
-        const periodo = document.getElementById('monthSelect')?.value || '';
-        const equipe = document.getElementById('teamFilter')?.value || '';
-        const vendedor = document.getElementById('vendedorFilter')?.value || '';
-        const statusValue = document.getElementById('statusFilter')?.value || '';
-        
-        // Mapear valores de status
-        let status = 'Atrasados + Cancelados';
-        if (statusValue === 'ATRASADO') status = 'Somente Atrasados';
-        if (statusValue === 'CANCELADO') status = 'Somente Cancelados';
+        const { rows, totalVendas } = collectInadDataForExport();
+        if (!rows.length) { alert('Nenhum dado para exportar com os filtros selecionados.'); return; }
 
         const btnExcel = document.getElementById('btnExportExcel');
         btnExcel.disabled = true;
         btnExcel.textContent = '⏳ Gerando...';
 
-        // Usar fetch direto com header de autorização
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-          throw new Error('Token não encontrado. Faça login novamente.');
-        }
+        // Exportar como CSV (compatível com Excel)
+        const csvHeaders = ['Ata', 'Ano', 'Status', 'Equipe', 'Vendedor', 'Cliente', 'Contrato', 'Telefone', 'Valor'];
+        const csvRows = rows.map(r => [
+          r.ata || '',
+          r.ano || '',
+          r.status || '',
+          r.equipe || '',
+          r.vendedor || '',
+          r.cliente || '',
+          r.contrato || '',
+          r.telefone || '',
+          Number(r.valor) || 0
+        ].map(v => `"${v}"`).join(','));
 
-        const response = await fetch('/api/export/excel', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            periodo: periodo || undefined,
-            equipe: equipe || undefined,
-            vendedor: vendedor || undefined,
-            status
-          })
-        });
+        const totalInad = rows.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        const percInad = totalVendas > 0 ? ((totalInad / totalVendas) * 100).toFixed(2) : '0.00';
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || `Erro HTTP ${response.status}`);
-        }
+        const csvContent = [
+          csvHeaders.join(','),
+          ...csvRows,
+          '',
+          `Total (${rows.length} contratos),"","","","","","",,${totalInad}`,
+          `Total Vendas: ${totalVendas}`,
+          `% Inadimplência: ${percInad}%`
+        ].join('\n');
 
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        link.href = url;
-        link.download = `inadimplencia_${new Date().getTime()}.xlsx`;
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `inadimplencia_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
 
         alert('✅ Excel exportado com sucesso!');
       } catch (error) {
@@ -877,65 +871,13 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       }
     }
 
-    async function exportToPdfApi() {
+    function exportToPdfApi() {
       try {
-        const periodo = document.getElementById('monthSelect')?.value || '';
-        const equipe = document.getElementById('teamFilter')?.value || '';
-        const vendedor = document.getElementById('vendedorFilter')?.value || '';
-        const statusValue = document.getElementById('statusFilter')?.value || '';
-        
-        // Mapear valores de status
-        let status = 'Atrasados + Cancelados';
-        if (statusValue === 'ATRASADO') status = 'Somente Atrasados';
-        if (statusValue === 'CANCELADO') status = 'Somente Cancelados';
-
-        const btnPdfApi = document.getElementById('btnExportPdfApi');
-        btnPdfApi.disabled = true;
-        btnPdfApi.textContent = '⏳ Gerando...';
-
-        // Usar fetch direto com header de autorização
-        const token = localStorage.getItem('authToken');
-        if (!token) {
-          throw new Error('Token não encontrado. Faça login novamente.');
-        }
-
-        const response = await fetch('/api/export/pdf', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            periodo: periodo || undefined,
-            equipe: equipe || undefined,
-            vendedor: vendedor || undefined,
-            status
-          })
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || `Erro HTTP ${response.status}`);
-        }
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `inadimplencia_${new Date().getTime()}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-
-        alert('✅ PDF exportado com sucesso!');
+        // Usar função existente de export PDF
+        exportInadReportPdf();
       } catch (error) {
         console.error('Erro ao exportar PDF:', error);
         alert(`❌ Erro ao exportar PDF: ${error.message}`);
-      } finally {
-        const btnPdfApi = document.getElementById('btnExportPdfApi');
-        btnPdfApi.disabled = false;
-        btnPdfApi.textContent = '📄 PDF';
       }
     }
 
