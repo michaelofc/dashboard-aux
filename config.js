@@ -18,8 +18,7 @@ const FILIAIS = [
   'Manaus',
   'Recife',
   'Porto Alegre',
-  'Goiânia',
-  'Teste'  // Para testes
+  'Goiânia'
 ];
 
 // Configurações do painel admin
