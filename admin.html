@@ -284,6 +284,8 @@
 </head>
 <body>
 
+<script src="config.js?v=1"></script>
+
 <!-- Login -->
 <div id="loginContainer" class="login-container">
   <div class="login-box">
@@ -336,7 +338,9 @@
 
         <div>
           <label id="scopeLabel">Filial</label>
-          <input type="text" id="scope" placeholder="Ex: São Paulo, Salvador, etc">
+          <select id="scope" required>
+            <option value="">-- Selecione a filial --</option>
+          </select>
         </div>
 
         <div>
@@ -546,6 +550,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedPassword = localStorage.getItem(PASSWORD_KEY) || ADMIN_PASSWORD;
   localStorage.setItem(PASSWORD_KEY, savedPassword);
   
+  // Popular select de filiais
+  populateFiliais();
+  
   document.getElementById('loginForm').addEventListener('submit', handleLogin);
   
   // Adicionar listeners para filtros de relatório
@@ -567,6 +574,46 @@ document.addEventListener('DOMContentLoaded', () => {
     loadGoals();
   }
 });
+
+/**
+ * Popular select de filiais com as opções definidas em config.js
+ */
+function populateFiliais() {
+  const scopeSelect = document.getElementById('scope');
+  if (!scopeSelect) return;
+
+  // Usar FILIAIS do config.js ou lista padrão
+  const filiais = window.FILIAIS || [
+    'Santo André',
+    'São Paulo',
+    'Campinas',
+    'Sorocaba',
+    'Ribeirão Preto',
+    'Curitiba',
+    'Brasília',
+    'Belo Horizonte',
+    'Rio de Janeiro',
+    'Salvador',
+    'Fortaleza',
+    'Manaus',
+    'Recife',
+    'Porto Alegre',
+    'Goiânia',
+    'Teste'
+  ];
+
+  // Limpar e repopular o select
+  scopeSelect.innerHTML = '<option value="">-- Selecione a filial --</option>';
+  
+  filiais.forEach(filial => {
+    const option = document.createElement('option');
+    option.value = filial;
+    option.textContent = filial;
+    scopeSelect.appendChild(option);
+  });
+  
+  console.log('✅ Filiais carregadas:', filiais.length);
+}
 
 function handleLogin(e) {
   e.preventDefault();
