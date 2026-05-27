@@ -47,6 +47,9 @@ const GamificationModule = (() => {
       // Criar container de gamificação
       createGamificationUI();
 
+      // Carregar e atualizar metas do admin primeiro (para popular o filtro regional)
+      loadAdminGoals();
+
       // Carregar dados
       await loadGamificationData();
 
