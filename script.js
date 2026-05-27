@@ -368,40 +368,10 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
   // ===== Módulo Dashboard (extraído e reduzido a partir do script original) =====
   const Dashboard = (() => {
-    // Função auxiliar para converter URL para formato CSV publicado
-    const convertToCSVUrl = (url) => {
-      if (!url) return '';
-      let csvUrl = url;
-      
-      // Remover /pubhtml e adicionar /pub se necessário
-      if (csvUrl.includes('/pubhtml')) {
-        csvUrl = csvUrl.replace('/pubhtml', '/pub');
-      } else if (!csvUrl.includes('/pub')) {
-        // Se não tiver /pub, assumir que é URL editável e tentar convertê-la
-        // URLs editáveis: https://docs.google.com/spreadsheets/d/ID/edit#gid=0
-        // Convertidas: https://docs.google.com/spreadsheets/d/ID/pub?output=csv
-        if (csvUrl.includes('/edit')) {
-          csvUrl = csvUrl.split('/edit')[0] + '/pub';
-        } else if (csvUrl.includes('/spreadsheets/d/') && !csvUrl.includes('/pub')) {
-          csvUrl = csvUrl + '/pub';
-        }
-      }
-      
-      // Garantir que tem output=csv
-      if (!csvUrl.includes('output=csv')) {
-        csvUrl = csvUrl + (csvUrl.includes('?') ? '&' : '?') + 'output=csv';
-      }
-      
-      // Remover /edit#gid se existir
-      csvUrl = csvUrl.split('/edit')[0];
-      
-      console.log('📋 URL Original:', url);
-      console.log('📋 URL Convertida para CSV:', csvUrl);
-      return csvUrl;
-    };
-    
     let sheetUrl = localStorage.getItem('sheetUrl');
-    let SHEET_CSV_URL = convertToCSVUrl(sheetUrl);
+    let SHEET_CSV_URL = '';
+    if (sheetUrl && sheetUrl.includes('/pubhtml')) SHEET_CSV_URL = sheetUrl.replace('/pubhtml', '/pub') + '&output=csv';
+    else if (sheetUrl && sheetUrl.includes('output=csv')) SHEET_CSV_URL = sheetUrl;
   // atualizar estado compartilhado
   window.AppState.sheetUrl = sheetUrl || '';
 
@@ -1386,16 +1356,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
     async function loadSheetData() {
       const saveEl = document.getElementById('saveSheetUrl'); const inputEl = document.getElementById('sheetUrlInput'); if (inputEl) inputEl.value = localStorage.getItem('sheetUrl') || '';
-      
-      // Mostrar mensagem de carregamento
-      const loadingMsg = document.getElementById('loadingMsg');
-      if (loadingMsg) {
-        loadingMsg.style.display = 'block';
-        loadingMsg.innerHTML = '⏳ Carregando planilha...';
-      }
-      
       if (!SHEET_CSV_URL) {
-        console.warn('⚠️ Nenhuma URL de planilha fornecida. Usando dados de teste.');
         // Dados de teste mínimos
         rawData = [
           { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, contrato:'C1', telefone:'', dataVenda:new Date(2025,1,1) },
@@ -1404,44 +1365,23 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         ];
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        fillFilters(); await loadAuxSheet(); 
-        if (loadingMsg) loadingMsg.innerHTML = '⚠️ Nenhuma planilha carregada. Usando dados de teste.';
-        setTimeout(() => { if (loadingMsg) loadingMsg.style.display='none'; }, 2000);
-        processVencimentoData(); 
-        setTimeout(()=>updateDashboard(),100); 
-        return;
+        fillFilters(); await loadAuxSheet(); document.getElementById('loadingMsg').style.display='none'; processVencimentoData(); setTimeout(()=>updateDashboard(),100); return;
       }
-      
       try {
+        document.getElementById('loadingMsg').style.display = 'block';
         // Usar proxy do backend para evitar CORS na Vercel
         const baseUrl = window.location.origin; // Pega a origem atual (localhost ou Vercel)
-        // Adicionar timestamp para evitar cache do Google Sheets
-        const cacheBreaker = '&_cb=' + Date.now();
-        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(SHEET_CSV_URL + cacheBreaker);
+        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(SHEET_CSV_URL);
         console.log('📊 Carregando planilha via proxy:', proxyUrl);
-        
-        if (loadingMsg) loadingMsg.innerHTML = '📊 Buscando dados do Google Sheets...';
-        
         const resp = await fetch(proxyUrl); 
-        if (!resp.ok) {
-          const errorText = await resp.text();
-          console.error('❌ Erro HTTP', resp.status, ':', errorText);
-          throw new Error(`Erro ${resp.status}: ${resp.statusText}`); 
-        }
-        
+        if (!resp.ok) throw new Error('Erro ao buscar planilha: ' + resp.statusText); 
         console.log('✅ Planilha carregada com sucesso via proxy');
         const csv = await resp.text();
-        
-        if (!csv || csv.trim().length === 0) {
-          throw new Error('Planilha vazia ou sem dados');
-        }
-        
         const delim = detectDelimiter(csv);
         const rows = csv.trim().split(/\r?\n/).map(l=> l.split(delim));
         const headers = rows[0].map(h => (h||'').toString().trim().toLowerCase());
         const norm = (val) => (val||'').toString().trim();
         const getIdx = (alts) => headers.findIndex(h => alts.includes(h));
-        
         const iAta = getIdx(['ata','mês','mes']);
         const iAno = getIdx(['ano','ano_ref','ano referência','ano referencia']);
         const iStatus = getIdx(['status','situação','situacao']);
@@ -1454,9 +1394,6 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         const iContrato = getIdx(['contrato','n_contrato','num_contrato','numero_contrato']);
         const iData = getIdx(['data','data_venda','data venda','dt_venda','dt venda']);
         const iTelefone = getIdx(['telefone','tel','celular','fone','phone','contato']);
-        
-        console.log(`📋 Colunas detectadas: ata=${iAta}, ano=${iAno}, status=${iStatus}, vencimento=${iVenc}, equipe=${iEquipe}, vendedor=${iVend}`);
-        
         rawData = rows.slice(1).map(cols => {
           const ata = iAta>=0 ? norm(cols[iAta]) : '';
           const ano = iAno>=0 ? norm(cols[iAno]) : '';
@@ -1479,25 +1416,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           if (!dataVenda) dataVenda = parseDateFromAta(ata, ano);
           if (!(dataVenda instanceof Date) || isNaN(dataVenda)) dataVenda = new Date();
           return { ata, ano: ano || String(dataVenda.getFullYear()), status, vencimento, equipe, vendedor, supervisor, cliente, valor, contrato, telefone, dataVenda };
-        }).filter(r => r.valor > 0 || r.status); // Filtrar registros vazios
-        
-        console.log(`✅ ${rawData.length} registros carregados da planilha`);
-        
+        });
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
         uniqueVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
         uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-        
-        console.log(`📊 Resumo: ${uniqueMonths.length} meses, ${uniqueTeams.length} equipes, ${uniqueVendedores.length} vendedores`);
-        
-        fillFilters(); 
-        await loadAuxSheet(); 
-        if (loadingMsg) loadingMsg.style.display='none'; 
-        processVencimentoData(); 
-        setTimeout(()=>updateDashboard(),100);
+        fillFilters(); await loadAuxSheet(); document.getElementById('loadingMsg').style.display='none'; processVencimentoData(); setTimeout(()=>updateDashboard(),100);
       } catch (e) { 
         console.error('❌ Erro ao carregar dados:', e);
-        
         // Usar dados de teste quando há erro
         rawData = [
           { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, contrato:'C1', telefone:'', dataVenda:new Date(2025,1,1) },
@@ -1510,25 +1436,20 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         await loadAuxSheet(); 
         processVencimentoData(); 
         setTimeout(()=>updateDashboard(),100);
-        
-        if (loadingMsg) {
-          loadingMsg.innerHTML = `
-            <div style="color: #f59e0b; padding: 16px; background: rgba(245,158,11,0.1); border-radius: 8px; margin: 12px 0; border-left: 4px solid #f59e0b;">
-              <strong>⚠️ Erro ao carregar planilha:</strong><br>
-              <code style="font-size: 0.85rem; color: #fbbf24;">${e.message}</code><br><br>
-              <small style="color: #cbd5e1;">
-                <strong>Verifique:</strong>
-                <ul style="margin: 8px 0; padding-left: 20px;">
-                  <li>✓ URL está correta?</li>
-                  <li>✓ Link é do tipo <strong>/pub?output=csv</strong> ou publicado?</li>
-                  <li>✓ Planilha está compartilhada publicamente?</li>
-                  <li>✓ Formato esperado: ata, ano, status, vencimento, equipe, vendedor, valor</li>
-                </ul>
-                <strong>Usando dados de teste para visualizar dashboard.</strong>
-              </small>
-            </div>
-          `;
-        }
+        document.getElementById('loadingMsg').innerHTML = `
+          <div style="color: #f59e0b; padding: 16px; background: #fef3c7; border-radius: 8px; margin: 12px 0;">
+            <strong>⚠️ Erro ao carregar planilha real:</strong><br>
+            ${e.message}<br><br>
+            <small>Verifique:
+              <ul style="margin: 8px 0; padding-left: 20px;">
+                <li>URL da planilha está correta?</li>
+                <li>Planilha está publicada em "Publicar na web"?</li>
+                <li>Backend está respondendo em /api/sheet?</li>
+              </ul>
+              <strong>Usando dados de teste para visualizar o dashboard com a meta do admin panel.</strong>
+            </small>
+          </div>
+        `;
       }
     }
 
@@ -1559,22 +1480,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     if (saveBtn && input) {
         saveBtn.onclick = () => {
           const url = input.value.trim();
-          
-          // Validações básicas
-          if (!url) { alert('❌ Por favor, insira a URL da planilha'); return; }
-          if (!url.startsWith('http')) { alert('❌ URL deve começar com http:// ou https://'); return; }
-          if (!url.includes('docs.google.com/spreadsheets')) { alert('❌ Deve ser um link de Google Sheets'); return; }
-          
-          console.log('🔄 Salvando nova URL da planilha...');
+          if (!url.startsWith('http') || !url.includes('docs.google.com/spreadsheets/')) { alert('Cole o link publicado da planilha Google.'); return; }
           localStorage.setItem('sheetUrl', url);
-          sheetUrl = url; 
-          window.AppState.sheetUrl = url;
-          
-          // Converter URL para formato CSV usando a função
-          SHEET_CSV_URL = convertToCSVUrl(url);
-          
-          // Força reload dos dados
-          console.log('✅ URL salva. Carregando dados...');
+      sheetUrl = url; window.AppState.sheetUrl = url; SHEET_CSV_URL = url.includes('/pubhtml') ? url.replace('/pubhtml','/pub') + '&output=csv' : url;
           loadSheetData();
         };
       }
