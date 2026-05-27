@@ -53,6 +53,16 @@ const GamificationModule = (() => {
       // Atualizar display
       updateDisplay();
 
+      // Adicionar listener para mudança de filtro de regional/filial
+      const teamFilterElement = document.getElementById('teamFilter');
+      if (teamFilterElement) {
+        teamFilterElement.addEventListener('change', () => {
+          console.log('📍 Filtro de regional alterado - recarregando metas...');
+          loadAdminGoals();  // Recarregar com novo filtro
+          updateDisplay();   // Atualizar display com metas filtradas
+        });
+      }
+
       // Auto-refresh a cada 5 minutos
       setInterval(updateGamificationData, 5 * 60 * 1000);
     } catch (error) {
@@ -119,18 +129,33 @@ const GamificationModule = (() => {
   }
 
   /**
-   * Carregar metas do painel admin
+   * Carregar metas do painel admin e filtrar por filial selecionada
    */
   function loadAdminGoals() {
     try {
       const adminGoals = JSON.parse(localStorage.getItem('dashboard_goals') || '[]');
       
+      // Pegar a regional/filial selecionada no filtro
+      const selectedRegional = document.getElementById('teamFilter')?.value || '';
+      
       if (adminGoals.length > 0) {
+        // Filtrar metas por filial: apenas mostrar metas da filial selecionada
+        let filteredGoals = adminGoals;
+        if (selectedRegional) {
+          // Filtrar apenas as metas onde o scope (filial) corresponde à regional selecionada
+          filteredGoals = adminGoals.filter(goal => 
+            goal.scope && goal.scope.toLowerCase() === selectedRegional.toLowerCase()
+          );
+          console.log(`🔍 Filtrando metas para: "${selectedRegional}" | Encontradas: ${filteredGoals.length}/${adminGoals.length}`);
+        } else {
+          console.log('ℹ️ Nenhuma filial selecionada - mostrando todas as metas');
+        }
+        
         // Converter metas do admin para formato de gamificação
         // Para metas de inadimplência: quanto maior a redução, melhor
         // targetInadempl é o objetivo (menor inadimplência = melhor)
         // currentInadempl é o valor atual
-        gamificationData.goals = adminGoals.map(goal => {
+        gamificationData.goals = filteredGoals.map(goal => {
           // Se o objetivo é reduzir inadimplência, o "progresso" é a redução
           // Ex: Reduzir de 50% para 25% = objetivo é 25% (meta mínima)
           // Se atual é 40%, progresso = (50-40) = 10% reduzido de 25% necessário = 40% progresso
