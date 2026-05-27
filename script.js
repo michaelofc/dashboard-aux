@@ -1203,67 +1203,23 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
       if (!ranking.length) { podiumEl.innerHTML = ''; listEl.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Sem dados de equipe no período</div>'; return; }
 
-      const medals = ['🥇','🥈','🥉'];
-      const podiumColors = [
-        { bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)', shadow: '0 0 25px rgba(251,191,36,.4)', border: 'rgba(251,191,36,.5)', height: '140px' },
-        { bg: 'linear-gradient(135deg,#cbd5e1,#94a3b8)', shadow: '0 0 20px rgba(148,163,184,.3)', border: 'rgba(148,163,184,.4)', height: '115px' },
-        { bg: 'linear-gradient(135deg,#d97706,#b45309)', shadow: '0 0 20px rgba(217,119,6,.3)', border: 'rgba(217,119,6,.4)', height: '95px' }
-      ];
-
-      // Podium (top 3)
-      const top3 = ranking.slice(0, 3);
-      const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : (top3.length === 2 ? [top3[1], top3[0]] : [top3[0]]);
-      const podiumIdxMap = top3.length >= 3 ? [1, 0, 2] : (top3.length === 2 ? [1, 0] : [0]);
-
-      podiumEl.innerHTML = podiumOrder.map((t, i) => {
-        const realIdx = podiumIdxMap[i];
-        const pc = podiumColors[realIdx];
-        const inadPerc = (t.inad * 100).toFixed(1);
-        const inadColor = t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5';
-        const isFirst = realIdx === 0;
-        const firstGlow = isFirst ? 'animation:championPulse 2s ease-in-out infinite;' : '';
-        const firstCardStyle = isFirst
-          ? `background:linear-gradient(135deg,rgba(251,191,36,.12),rgba(245,158,11,.05));border:2px solid rgba(251,191,36,.6);box-shadow:${pc.shadow}, 0 0 40px rgba(251,191,36,.2);animation:championCardGlow 2.5s ease-in-out infinite;`
-          : `background:var(--glass-bg);border:1px solid ${pc.border};box-shadow:${pc.shadow};`;
-        return `
-          <div style="display:flex;flex-direction:column;align-items:center;width:${isFirst ? '210px' : '170px'};">
-            <div style="font-size:${isFirst ? '3.2rem' : '2.2rem'};margin-bottom:4px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.4));${firstGlow}">${medals[realIdx]}</div>
-            <div style="font-size:${isFirst ? '0.85rem' : '0.7rem'};color:${isFirst ? '#fbbf24' : '#94a3b8'};font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">${realIdx+1}º Lugar</div>
-            <div style="${firstCardStyle}border-radius:${isFirst ? '20px' : '14px'};padding:${isFirst ? '20px 16px' : '14px 10px'};width:100%;text-align:center;min-height:${pc.height};display:flex;flex-direction:column;justify-content:center;transition:all .3s;cursor:default;"
-                 onmouseenter="this.style.transform='translateY(-8px) scale(1.04)'" onmouseleave="this.style.transform='none'">
-              ${isFirst ? '<div style="font-size:1.5rem;margin-bottom:6px;">👑</div>' : ''}
-              <div style="font-weight:800;font-size:${isFirst ? '1.15rem' : '0.9rem'};color:#e2e8f0;margin-bottom:8px;line-height:1.2;">${t.nome}</div>
-              <div style="font-family:'JetBrains Mono',monospace;font-size:${isFirst ? '2rem' : '1.4rem'};font-weight:900;color:${inadColor};text-shadow:0 0 ${isFirst ? '25px' : '12px'} ${inadColor}44;margin-bottom:4px;">${inadPerc}%</div>
-              <div style="font-size:0.7rem;color:#94a3b8;">Inadimplência</div>
-              <div style="margin-top:8px;font-size:0.75rem;color:#cbd5e1;">Prod: ${formatCurrency(t.producao)}</div>
-            </div>
-          </div>`;
-      }).join('');
-
-      // Lista restante (4º em diante)
-      const rest = ranking.slice(3);
-      if (!rest.length) { listEl.innerHTML = ''; return; }
-      listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">' + rest.map((t, i) => {
-        const pos = i + 4;
-        const inadPerc = (t.inad * 100).toFixed(1);
-        const barWidth = Math.min(100, Math.max(3, t.inad * 100 * 2));
-        const barColor = t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5';
-        return `
-          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 16px;transition:all .3s;"
-               onmouseenter="this.style.background='rgba(255,255,255,.06)';this.style.transform='translateX(4px)'" onmouseleave="this.style.background='rgba(255,255,255,.03)';this.style.transform='none'">
-            <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-weight:800;color:#94a3b8;font-size:0.9rem;flex-shrink:0;">${pos}º</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-weight:700;color:#e2e8f0;font-size:0.9rem;margin-bottom:4px;">${t.nome}</div>
-              <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;">
-                <div style="height:100%;width:${barWidth}%;background:${barColor};border-radius:6px;transition:width .8s ease;"></div>
-              </div>
-            </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:${barColor};font-size:1rem;">${inadPerc}%</div>
-              <div style="font-size:0.7rem;color:#94a3b8;">${formatCurrency(t.producao)}</div>
-            </div>
-          </div>`;
-      }).join('') + '</div>';
+      // MINIMALISTA: Tabela simples sem cards grandes
+      podiumEl.innerHTML = '';
+      listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:0;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden;">' + 
+        ranking.map((t, i) => {
+          const pos = i + 1;
+          const inadPerc = (t.inad * 100).toFixed(1);
+          const medalIcon = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '';
+          const inadColor = t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5';
+          const rowBg = i % 2 === 0 ? 'rgba(255,255,255,.02)' : 'rgba(0,0,0,.1)';
+          return `
+            <div style="display:grid;grid-template-columns:40px 1fr 100px 120px;gap:12px;align-items:center;padding:12px 16px;background:${rowBg};border-bottom:${i < ranking.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none'};transition:background .2s;">
+              <div style="text-align:center;font-weight:800;color:#94a3b8;font-size:0.9rem;">${medalIcon || pos}º</div>
+              <div style="font-weight:600;color:#e2e8f0;font-size:0.95rem;">${t.nome}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${inadColor};font-size:0.95rem;text-align:right;">${inadPerc}%</div>
+              <div style="font-size:0.85rem;color:#94a3b8;text-align:right;">${formatCurrency(t.producao)}</div>
+            </div>`;
+        }).join('') + '</div>';
     }
 
     function renderVendorRanking(dataIni, dataFim) {
@@ -1289,91 +1245,31 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       });
 
       const allVendors = Array.from(vendorMap.values()).map(t => ({ ...t, inad: t.producao > 0 ? t.inadValor / t.producao : 0 }));
-
-      // Separar vendedores com vendas e sem vendas (produção zero fica no final)
-
-      // Critério para pódio: vendas acima de 2 milhões
-      const podiumEligible = allVendors.filter(v => v.producao > 2000000).sort((a, b) => a.inad - b.inad);
       const withSales = allVendors.filter(v => v.producao > 0).sort((a, b) => a.inad - b.inad);
       const noSales = allVendors.filter(v => v.producao === 0).sort((a, b) => a.nome.localeCompare(b.nome));
       const ranking = [...withSales, ...noSales];
 
       if (!ranking.length) { podiumEl.innerHTML = ''; listEl.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Sem dados de vendedores no período</div>'; return; }
 
-      const medals = ['🥇','🥈','🥉'];
-      const podiumColors = [
-        { bg: 'linear-gradient(135deg,#06ffa5,#00d4ff)', shadow: '0 0 25px rgba(6,255,165,.35)', border: 'rgba(6,255,165,.5)', height: '140px' },
-        { bg: 'linear-gradient(135deg,#cbd5e1,#94a3b8)', shadow: '0 0 20px rgba(148,163,184,.3)', border: 'rgba(148,163,184,.4)', height: '115px' },
-        { bg: 'linear-gradient(135deg,#a855f7,#7c3aed)', shadow: '0 0 20px rgba(168,85,247,.3)', border: 'rgba(168,85,247,.4)', height: '95px' }
-      ];
-
-      // Pódio (top 3 com vendas acima de 2 milhões)
-      const top3 = podiumEligible.slice(0, 3);
-      const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : (top3.length === 2 ? [top3[1], top3[0]] : top3.length === 1 ? [top3[0]] : []);
-      const podiumIdxMap = top3.length >= 3 ? [1, 0, 2] : (top3.length === 2 ? [1, 0] : [0]);
-      if (!top3.length) {
-        podiumEl.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Nenhum vendedor com vendas acima de 2 milhões no período</div>';
-      } else {
-        podiumEl.innerHTML = podiumOrder.map((t, i) => {
-          const realIdx = podiumIdxMap[i];
-          const pc = podiumColors[realIdx];
-          const inadPerc = (t.inad * 100).toFixed(1);
-          const inadColor = t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5';
-          const isFirst = realIdx === 0;
-          const firstGlow = isFirst ? 'animation:championPulse 2s ease-in-out infinite;' : '';
-          const firstCardStyle = isFirst
-            ? `background:linear-gradient(135deg,rgba(6,255,165,.1),rgba(0,212,255,.05));border:2px solid rgba(6,255,165,.5);box-shadow:${pc.shadow}, 0 0 40px rgba(6,255,165,.15);animation:championCardGlow 2.5s ease-in-out infinite;`
-            : `background:var(--glass-bg);border:1px solid ${pc.border};box-shadow:${pc.shadow};`;
+      // MINIMALISTA: Tabela simples sem cards grandes
+      podiumEl.innerHTML = '';
+      listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:0;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden;">' + 
+        ranking.map((t, i) => {
+          const pos = i + 1;
+          const isZero = t.producao === 0;
+          const medalIcon = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '';
+          const inadPerc = isZero ? '-' : (t.inad * 100).toFixed(1);
+          const inadColor = isZero ? '#475569' : (t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5');
+          const rowBg = i % 2 === 0 ? 'rgba(255,255,255,.02)' : 'rgba(0,0,0,.1)';
           return `
-            <div style="display:flex;flex-direction:column;align-items:center;width:${isFirst ? '210px' : '170px'};">
-              <div style="font-size:${isFirst ? '3.2rem' : '2.2rem'};margin-bottom:4px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.4));${firstGlow}">${medals[realIdx]}</div>
-              <div style="font-size:${isFirst ? '0.85rem' : '0.7rem'};color:${isFirst ? '#06ffa5' : '#94a3b8'};font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">${realIdx + 1}º Lugar</div>
-              <div style="${firstCardStyle}border-radius:${isFirst ? '20px' : '14px'};padding:${isFirst ? '20px 16px' : '14px 10px'};width:100%;text-align:center;min-height:${pc.height};display:flex;flex-direction:column;justify-content:center;transition:all .3s;cursor:default;"
-                   onmouseenter="this.style.transform='translateY(-8px) scale(1.04)'" onmouseleave="this.style.transform='none'">
-                ${isFirst ? '<div style=\"font-size:1.5rem;margin-bottom:6px;\">⭐</div>' : ''}
-                <div style="font-weight:800;font-size:${isFirst ? '1.15rem' : '0.9rem'};color:#e2e8f0;margin-bottom:4px;line-height:1.2;">${t.nome}</div>
-                <div style="font-size:0.65rem;color:#64748b;margin-bottom:8px;">${t.equipe}</div>
-                <div style="font-family:'JetBrains Mono',monospace;font-size:${isFirst ? '2rem' : '1.4rem'};font-weight:900;color:${inadColor};text-shadow:0 0 ${isFirst ? '25px' : '12px'} ${inadColor}44;margin-bottom:4px;">${inadPerc}%</div>
-                <div style="font-size:0.7rem;color:#94a3b8;">Inadimplência</div>
-                <div style="margin-top:8px;font-size:0.75rem;color:#cbd5e1;">Prod: ${formatCurrency(t.producao)}</div>
-              </div>
+            <div style="display:grid;grid-template-columns:40px 1fr 80px 100px 120px;gap:12px;align-items:center;padding:12px 16px;background:${rowBg};border-bottom:${i < ranking.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none'};transition:background .2s;${isZero ? 'opacity:.6;' : ''}">
+              <div style="text-align:center;font-weight:800;color:#94a3b8;font-size:0.9rem;">${medalIcon || pos}º</div>
+              <div style="font-weight:600;color:#e2e8f0;font-size:0.95rem;">${t.nome}</div>
+              <div style="font-size:0.8rem;color:#94a3b8;text-align:center;">${t.equipe}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${inadColor};font-size:0.95rem;text-align:right;">${inadPerc}${isZero ? '' : '%'}</div>
+              <div style="font-size:0.85rem;color:#94a3b8;text-align:right;">${formatCurrency(t.producao)}</div>
             </div>`;
-        }).join('');
-      }
-
-      // Lista restante (4º em diante com vendas + vendedores zerados no final)
-      const restWithSales = withSales.slice(3);
-      const allRest = [...restWithSales, ...noSales];
-      if (!allRest.length) { listEl.innerHTML = ''; return; }
-
-      let pos = 4;
-      listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">' + allRest.map((t) => {
-        const isZero = t.producao === 0;
-        const inadPerc = isZero ? '-' : (t.inad * 100).toFixed(1) + '%';
-        const barWidth = isZero ? 0 : Math.min(100, Math.max(3, t.inad * 100 * 2));
-        const barColor = isZero ? '#475569' : (t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5');
-        const currentPos = pos++;
-        const zeroTag = isZero ? '<span style="font-size:0.6rem;background:rgba(71,85,105,.3);color:#64748b;padding:2px 6px;border-radius:4px;margin-left:8px;">SEM VENDAS</span>' : '';
-        return `
-          <div style="display:flex;align-items:center;gap:12px;background:${isZero ? 'rgba(71,85,105,.06)' : 'rgba(255,255,255,.03)'};border:1px solid ${isZero ? 'rgba(71,85,105,.15)' : 'rgba(255,255,255,.06)'};border-radius:12px;padding:12px 16px;transition:all .3s;${isZero ? 'opacity:.6;' : ''}"
-               onmouseenter="this.style.background='${isZero ? 'rgba(71,85,105,.1)' : 'rgba(255,255,255,.06)'}';this.style.transform='translateX(4px)'" onmouseleave="this.style.background='${isZero ? 'rgba(71,85,105,.06)' : 'rgba(255,255,255,.03)'}';this.style.transform='none'">
-            <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-weight:800;color:${isZero ? '#475569' : '#94a3b8'};font-size:0.9rem;flex-shrink:0;">${currentPos}º</div>
-            <div style="flex:1;min-width:0;">
-              <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
-                <span style="font-weight:700;color:${isZero ? '#64748b' : '#e2e8f0'};font-size:0.9rem;">${t.nome}</span>
-                <span style="font-size:0.65rem;color:#64748b;">· ${t.equipe}</span>
-                ${zeroTag}
-              </div>
-              <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;">
-                <div style="height:100%;width:${barWidth}%;background:${barColor};border-radius:6px;transition:width .8s ease;"></div>
-              </div>
-            </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:${barColor};font-size:1rem;">${inadPerc}</div>
-              <div style="font-size:0.7rem;color:#94a3b8;">${formatCurrency(t.producao)}</div>
-            </div>
-          </div>`;
-      }).join('') + '</div>';
+        }).join('') + '</div>';
     }
 
     function initMetricSlide() {

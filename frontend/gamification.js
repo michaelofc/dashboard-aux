@@ -385,21 +385,19 @@ const GamificationModule = (() => {
     const container = document.getElementById('miniRankingContainer');
     if (!container) return;
 
-    container.innerHTML = ranking.map((user, index) => `
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #e5e7eb;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <span style="font-size: 24px; font-weight: bold; color: ${index === 0 ? '#f59e0b' : index === 1 ? '#9ca3af' : index === 2 ? '#d97706' : '#6b7280'};">${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}</span>
-          <div>
-            <div style="font-weight: 600; color: #333;">${user.name}</div>
-            <div style="font-size: 12px; color: #666;">${user.team || 'Time'}</div>
-          </div>
-        </div>
-        <div style="text-align: right;">
-          <div style="font-weight: bold; color: #667eea;">${user.total_pontos?.toLocaleString() || 0} pts</div>
-          <div style="font-size: 12px; color: #666;">${user.total_conquistas || 0} conquistas</div>
-        </div>
-      </div>
-    `).join('');
+    // MINIMALISTA: Tabela simples sem cards grandes
+    container.innerHTML = '<div style="display:flex;flex-direction:column;gap:0;border:1px solid rgba(0,0,0,.1);border-radius:8px;overflow:hidden;">' + 
+      ranking.map((user, index) => {
+        const rowBg = index % 2 === 0 ? 'rgba(255,255,255,.8)' : 'rgba(0,0,0,.02)';
+        const medalIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+        return `
+          <div style="display:grid;grid-template-columns:40px 1fr 80px 120px;gap:12px;align-items:center;padding:12px 16px;background:${rowBg};border-bottom:${index < ranking.length - 1 ? '1px solid rgba(0,0,0,.05)' : 'none'};transition:background .2s;">
+            <div style="text-align:center;font-weight:800;color:#666;font-size:0.9rem;">${medalIcon || '#' + (index + 1)}</div>
+            <div style="font-weight:600;color:#333;font-size:0.95rem;">${user.name}</div>
+            <div style="font-size:0.8rem;color:#666;text-align:center;">${user.team || 'Time'}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#667eea;font-size:0.9rem;text-align:right;">${(user.total_pontos || 0).toLocaleString()} pts</div>
+          </div>`;
+      }).join('') + '</div>';
   }
 
   /**
