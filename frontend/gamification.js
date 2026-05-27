@@ -155,8 +155,13 @@ const GamificationModule = (() => {
         // Calcular pontos baseado em metas atingidas
         let pontosGanhos = 0;
         gamificationData.goals.forEach(goal => {
-          const percentualAtingido = Math.min((goal.alcancado / goal.meta) * 100, 100);
-          pontosGanhos += Math.floor((percentualAtingido / 100) * goal.pointsPerAchievement);
+          const meta = goal.meta || 1;  // Evitar divisão por zero
+          const alcancado = goal.alcancado || 0;
+          const percentualAtingido = Math.min((alcancado / meta) * 100, 100);
+          const pontos = Math.floor((percentualAtingido / 100) * goal.pointsPerAchievement);
+          if (!isNaN(pontos)) {
+            pontosGanhos += pontos;
+          }
         });
         
         gamificationData.totalPontos = pontosGanhos;
@@ -241,8 +246,12 @@ const GamificationModule = (() => {
 
     if (goalsContainer && gamificationData.goals) {
       goalsContainer.innerHTML = gamificationData.goals.map(goal => {
-        const progresso = Math.min((goal.alcancado / goal.meta) * 100, 100);
-        const atingiu = goal.alcancado >= goal.meta;
+        // Verificações de segurança para evitar NaN e undefined
+        const alcancado = goal.alcancado || 0;
+        const meta = goal.meta || 1;  // Evitar divisão por zero
+        
+        const progresso = Math.min((alcancado / meta) * 100, 100);
+        const atingiu = alcancado >= meta;
 
         return `
           <div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid ${atingiu ? '#10b981' : '#3b82f6'};">
@@ -251,7 +260,7 @@ const GamificationModule = (() => {
                 <span style="font-weight: 600; color: #333;">${goal.tipo}</span>
                 ${goal.description ? `<div style="font-size: 12px; color: #666; margin-top: 4px;">${goal.description}</div>` : ''}
               </div>
-              <span style="font-size: 12px; color: #666;">${goal.alcancado.toLocaleString()} / ${goal.meta.toLocaleString()}</span>
+              <span style="font-size: 12px; color: #666;">${alcancado.toLocaleString()} / ${meta.toLocaleString()}</span>
             </div>
             <div style="width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;">
               <div style="width: ${progresso}%; height: 100%; background: ${atingiu ? '#10b981' : '#3b82f6'}; transition: width 0.3s ease;"></div>
