@@ -136,13 +136,16 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     bindTabs() {
       const btnDash = document.getElementById('tabDashboard');
       const btnGame = document.getElementById('tabGamificacao');
+      const btnAdmin = document.getElementById('tabAdmin');
       if (btnDash) btnDash.addEventListener('click', () => this.mount('dashboard'));
       if (btnGame) btnGame.addEventListener('click', () => this.mount('gamificacao'));
+      if (btnAdmin) btnAdmin.addEventListener('click', () => window.location.href = '/admin.html');
     },
     setActive(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       if (tab === 'dashboard') document.getElementById('tabDashboard')?.classList.add('active');
       if (tab === 'gamificacao') document.getElementById('tabGamificacao')?.classList.add('active');
+      if (tab === 'admin') document.getElementById('tabAdmin')?.classList.add('active');
     },
     mount(view) {
       if (!this.el) return;
