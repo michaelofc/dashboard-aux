@@ -138,20 +138,31 @@ const GamificationModule = (() => {
     try {
       const adminGoals = JSON.parse(localStorage.getItem('dashboard_goals') || '[]');
       
-      // Pegar a regional/filial selecionada no filtro
+      // NOVO: Identificar a filial pelo URL (isolamento por filial)
+      const filialByUrl = window.getFilialBySheetUrl ? window.getFilialBySheetUrl() : null;
+      
+      // Pegar a regional/filial selecionada no filtro (secundária)
       const selectedRegional = document.getElementById('teamFilter')?.value || '';
       
       if (adminGoals.length > 0) {
-        // Filtrar metas por filial: apenas mostrar metas da filial selecionada
+        // Filtrar metas por filial: apenas mostrar metas da filial identificada pelo URL
         let filteredGoals = adminGoals;
-        if (selectedRegional) {
-          // Filtrar apenas as metas onde o scope (filial) corresponde à regional selecionada
+        
+        // PRIORIDADE 1: Se houver filial identificada pelo URL, usar APENAS ela
+        if (filialByUrl) {
+          filteredGoals = adminGoals.filter(goal => 
+            goal.scope && goal.scope.toLowerCase().trim() === filialByUrl.toLowerCase().trim()
+          );
+          console.log(`🔐 ISOLAMENTO BY URL: Filial ${filialByUrl} | Metas encontradas: ${filteredGoals.length}/${adminGoals.length}`);
+        } 
+        // PRIORIDADE 2: Se não houver filial pelo URL, usar filtro de regional (se selecionado)
+        else if (selectedRegional && selectedRegional !== 'Todas') {
           filteredGoals = adminGoals.filter(goal => 
             goal.scope && goal.scope.toLowerCase() === selectedRegional.toLowerCase()
           );
           console.log(`🔍 Filtrando metas para: "${selectedRegional}" | Encontradas: ${filteredGoals.length}/${adminGoals.length}`);
         } else {
-          console.log('ℹ️ Nenhuma filial selecionada - mostrando todas as metas');
+          console.log('ℹ️ Sem isolamento de filial - mostrando todas as metas');
         }
         
         // Converter metas do admin para formato de gamificação
