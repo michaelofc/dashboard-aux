@@ -815,50 +815,68 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
     // ===== EXPORTAÇÃO VIA API =====
 
-    function exportToExcel() {
+    async function exportToExcel() {
       try {
-        const { rows, totalVendas } = collectInadDataForExport();
-        if (!rows.length) { alert('Nenhum dado para exportar com os filtros selecionados.'); return; }
-
         const btnExcel = document.getElementById('btnExportExcel');
         btnExcel.disabled = true;
         btnExcel.textContent = '⏳ Gerando...';
 
-        // Exportar como CSV (compatível com Excel)
-        const csvHeaders = ['Ata', 'Ano', 'Status', 'Equipe', 'Vendedor', 'Cliente', 'Contrato', 'Telefone', 'Valor'];
-        const csvRows = rows.map(r => [
-          r.ata || '',
-          r.ano || '',
-          r.status || '',
-          r.equipe || '',
-          r.vendedor || '',
-          r.cliente || '',
-          r.contrato || '',
-          r.telefone || '',
-          Number(r.valor) || 0
-        ].map(v => `"${v}"`).join(','));
+        // Coletar filtros
+        const periodo = document.getElementById('monthSelect')?.value || '';
+        const equipe = document.getElementById('teamFilter')?.value || '';
+        const vendedor = document.getElementById('vendedorFilter')?.value || '';
+        const status = document.getElementById('statusFilter')?.value || '';
 
-        const totalInad = rows.reduce((s, r) => s + (Number(r.valor) || 0), 0);
-        const percInad = totalVendas > 0 ? ((totalInad / totalVendas) * 100).toFixed(2) : '0.00';
+        // Preparar payload
+        const payload = {
+          periodo: periodo || undefined,
+          equipe: equipe || undefined,
+          vendedor: vendedor || undefined,
+          status: status || undefined
+        };
 
-        const csvContent = [
-          csvHeaders.join(','),
-          ...csvRows,
-          '',
-          `Total (${rows.length} contratos),"","","","","","",,${totalInad}`,
-          `Total Vendas: ${totalVendas}`,
-          `% Inadimplência: ${percInad}%`
-        ].join('\n');
+        // Remover campos undefined
+        Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
+        // Obter token do localStorage
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          alert('❌ Você não está autenticado. Faça login novamente.');
+          return;
+        }
+
+        // Definir URL da API
+        const API_BASE = window.API_URL || 
+          (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : `${window.location.origin}/api`);
+
+        // Fazer requisição para a API
+        const response = await fetch(`${API_BASE}/export/excel`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Erro ao gerar Excel');
+        }
+
+        // Receber arquivo como blob
+        const blob = await response.blob();
+
+        // Criar link e fazer download
         const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', `inadimplencia_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute('download', `inadimplencia_${new Date().getTime()}.xlsx`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
 
         alert('✅ Excel exportado com sucesso!');
       } catch (error) {
