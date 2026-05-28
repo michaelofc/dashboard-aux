@@ -769,14 +769,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (specificMonthSel) {
         const prevSpecificMonth = specificMonthSel.value || '';
         specificMonthSel.innerHTML = '<option value="">Sem filtro</option>';
-        uniqueMonths.forEach(m => {
+        allAvailableMonths.forEach(m => {
           const [ano, mes] = m.split('-');
           const opt = document.createElement('option');
           opt.value = m;
           opt.textContent = `${getMonthName(Number(mes))} / ${ano}`;
           specificMonthSel.appendChild(opt);
         });
-        if (prevSpecificMonth && uniqueMonths.includes(prevSpecificMonth)) {
+        if (prevSpecificMonth && allAvailableMonths.includes(prevSpecificMonth)) {
           specificMonthSel.value = prevSpecificMonth;
         }
       }
@@ -817,8 +817,19 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
   function processVencimentoData() {
       const selectedMonth = document.getElementById('monthSelect')?.value; const selectedTeam = document.getElementById('teamFilter')?.value; const selectedVendedor = document.getElementById('vendedorFilter')?.value; const specificMonth = document.getElementById('specificMonthFilter')?.value;
       let filteredData = rawData;
-      if (selectedMonth) { const [anoRef, mesRef] = selectedMonth.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini: dataIni, fim: dataFim} = getPeriodo82(dataRef); filteredData = filteredData.filter(item => item.dataVenda >= dataIni && item.dataVenda <= dataFim); }
-      if (specificMonth) { filteredData = filteredData.filter(item => { const itemYear = item.ano; const itemMonth = String(item.dataVenda.getMonth() + 1).padStart(2, '0'); const itemYearMonth = `${itemYear}-${itemMonth}`; return itemYearMonth === specificMonth; }); }
+      if (specificMonth) {
+        filteredData = filteredData.filter(item => {
+          const itemYear = item.ano;
+          const itemMonth = String(item.dataVenda.getMonth() + 1).padStart(2, '0');
+          const itemYearMonth = `${itemYear}-${itemMonth}`;
+          return itemYearMonth === specificMonth;
+        });
+      } else if (selectedMonth) {
+        const [anoRef, mesRef] = selectedMonth.split('-').map(Number);
+        const dataRef = new Date(anoRef, mesRef - 1, 1);
+        const {ini: dataIni, fim: dataFim} = getPeriodo82(dataRef);
+        filteredData = filteredData.filter(item => item.dataVenda >= dataIni && item.dataVenda <= dataFim);
+      }
       if (selectedTeam) filteredData = filteredData.filter(item => item.equipe && item.equipe.toLowerCase() === selectedTeam.toLowerCase());
       if (selectedVendedor) filteredData = filteredData.filter(item => item.vendedor && item.vendedor.toLowerCase() === selectedVendedor.toLowerCase());
       const grupos = { '10': { total:0, inadimplente:0, contratos:0 }, '15': { total:0, inadimplente:0, contratos:0 }, '20': { total:0, inadimplente:0, contratos:0 }, '25': { total:0, inadimplente:0, contratos:0 } };
@@ -856,8 +867,17 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (!monthRef) return { rows: [], totalVendas: 0 };
       const [anoRef, mesRef] = monthRef.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini:dataIni, fim:dataFim} = getPeriodo82(dataRef);
       const inadSet = new Set(['ATRASADO','EM ATRASO','CANCELADO','INADIMPLENTE','VENCIDO']);
-      let periodData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
-      if (specificMonth) { periodData = periodData.filter(r => { const rYear = r.ano; const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0'); const rYearMonth = `${rYear}-${rMonth}`; return rYearMonth === specificMonth; }); }
+      let periodData = rawData.filter(r => (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
+      if (specificMonth) {
+        periodData = periodData.filter(r => {
+          const rYear = r.ano;
+          const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0');
+          const rYearMonth = `${rYear}-${rMonth}`;
+          return rYearMonth === specificMonth;
+        });
+      } else {
+        periodData = periodData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim);
+      }
       const totalVendas = periodData.reduce((s,r) => s + (Number(r.valor)||0), 0);
       const rows = periodData.filter(r => {
         const st = String(r.status||'').toUpperCase();
@@ -1159,8 +1179,17 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
   window.AppState.selectedMonth = monthRef;
   window.AppState.periodo82Text = periodoTexto;
   document.dispatchEvent(new CustomEvent('app:monthsUpdated', { detail: { uniqueMonths: window.AppState.uniqueMonths, selectedMonth: window.AppState.selectedMonth, periodo82Text: window.AppState.periodo82Text, sheetUrl: window.AppState.sheetUrl } }));
-      let dataFiltrada = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
-      if (specificMonth) { dataFiltrada = dataFiltrada.filter(r => { const rYear = r.ano; const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0'); const rYearMonth = `${rYear}-${rMonth}`; return rYearMonth === specificMonth; }); }
+      let dataFiltrada = rawData.filter(r => (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
+      if (specificMonth) {
+        dataFiltrada = dataFiltrada.filter(r => {
+          const rYear = r.ano;
+          const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0');
+          const rYearMonth = `${rYear}-${rMonth}`;
+          return rYearMonth === specificMonth;
+        });
+      } else {
+        dataFiltrada = dataFiltrada.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim);
+      }
       const totalVendas = dataFiltrada.reduce((acc,r)=>acc+r.valor,0);
       processVencimentoData();
       const totalAtrasado = dataFiltrada.filter(r=>r.status==='ATRASADO').reduce((acc,r)=>acc+r.valor,0);
@@ -1205,8 +1234,17 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
       // Agrupar por equipe no período
       const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
-      let teamData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.equipe);
-      if (specificMonth) { teamData = teamData.filter(r => { const rYear = r.ano; const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0'); const rYearMonth = `${rYear}-${rMonth}`; return rYearMonth === specificMonth; }); }
+      let teamData = rawData.filter(r => r.equipe);
+      if (specificMonth) {
+        teamData = teamData.filter(r => {
+          const rYear = r.ano;
+          const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0');
+          const rYearMonth = `${rYear}-${rMonth}`;
+          return rYearMonth === specificMonth;
+        });
+      } else {
+        teamData = teamData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim);
+      }
       const teamMap = new Map();
       teamData.forEach(r => {
         const key = r.equipe;
@@ -1249,11 +1287,20 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
 
       // Agrupar por vendedor no período
-      let vendorData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.vendedor
+      let vendorData = rawData.filter(r => r.vendedor
         && (!team || (r.equipe && r.equipe.toLowerCase() === team.toLowerCase()))
         && (!vendedorFilter || (r.vendedor.toLowerCase() === vendedorFilter.toLowerCase()))
       );
-      if (specificMonth) { vendorData = vendorData.filter(r => { const rYear = r.ano; const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0'); const rYearMonth = `${rYear}-${rMonth}`; return rYearMonth === specificMonth; }); }
+      if (specificMonth) {
+        vendorData = vendorData.filter(r => {
+          const rYear = r.ano;
+          const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0');
+          const rYearMonth = `${rYear}-${rMonth}`;
+          return rYearMonth === specificMonth;
+        });
+      } else {
+        vendorData = vendorData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim);
+      }
       const vendorMap = new Map();
       vendorData.forEach(r => {
         const key = r.vendedor;
