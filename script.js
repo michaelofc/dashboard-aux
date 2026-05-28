@@ -398,6 +398,24 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (y < 100) y = 2000 + y; // trata '25' -> 2025
       return new Date(y, Number(mes)-1, 1);
     }
+    
+    // Converte formato "jun./25" ou "jun/25" para "2025-06"
+    function convertAtaToYYYYMM(ata) {
+      const meses = { 'jan': '01','fev': '02','mar': '03','abr': '04','mai': '05','jun': '06','jul': '07','ago': '08','set': '09','out': '10','nov': '11','dez': '12' };
+      const match = (ata||'').match(/(\w{3})\D*(\d{1,4})/i);
+      if (!match) return null;
+      const m = meses[(match[1]||'').toLowerCase()] || null;
+      let y = Number(match[2]);
+      if (!m || !y) return null;
+      if (y < 100) y = 2000 + y;
+      return `${y}-${m}`;
+    }
+    
+    // Sincroniza meses de rawData E inadEvolData para criar lista completa
+    function mergeAllAvailableMonths(rawMonths, evoMonths) {
+      const allMonths = new Set([...rawMonths, ...evoMonths]);
+      return Array.from(allMonths).sort((a, b) => b.localeCompare(a));
+    }
 
   let rawData = [], uniqueMonths = [], uniqueTeams = [], uniqueVendedores = [], uniqueSupervisores = [], inadEvolData = [], evolutionData = [];
     let charts = {}, evolutionChart = null, showingMonths = 6, showingProduction = false;
@@ -656,13 +674,32 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
     function fillFilters() {
       const monthSel = document.getElementById('monthSelect'); if (!monthSel) return;
-      monthSel.innerHTML=''; uniqueMonths.forEach(m=>{ const [ano,mes]=m.split('-'); const opt=document.createElement('option'); opt.value=m; opt.textContent=`${getMonthName(Number(mes))} ${ano}`; monthSel.appendChild(opt); });
-  if (uniqueMonths.length>1) monthSel.value = uniqueMonths[1]; else if (uniqueMonths.length>0) monthSel.value = uniqueMonths[0];
+      
+      // Sincronizar meses para "Mês Referência": combinar rawData (uniqueMonths) com inadEvolData (aba auxiliar)
+      let allAvailableMonths = [...uniqueMonths];
+      if (inadEvolData && inadEvolData.length > 0) {
+        const evoMonths = inadEvolData
+          .map(e => convertAtaToYYYYMM(e.ata))
+          .filter(m => m !== null);
+        allAvailableMonths = mergeAllAvailableMonths(uniqueMonths, evoMonths);
+      }
+      
+      monthSel.innerHTML=''; 
+      allAvailableMonths.forEach(m=>{ 
+        const [ano,mes]=m.split('-'); 
+        const opt=document.createElement('option'); 
+        opt.value=m; 
+        opt.textContent=`${getMonthName(Number(mes))} ${ano}`; 
+        monthSel.appendChild(opt); 
+      });
+      if (allAvailableMonths.length>1) monthSel.value = allAvailableMonths[1]; 
+      else if (allAvailableMonths.length>0) monthSel.value = allAvailableMonths[0];
+      
       // sincronizar estado e notificar
       window.AppState.uniqueMonths = uniqueMonths;
       window.AppState.selectedMonth = monthSel.value || '';
       
-      // Popular filtro de mês específico com todos os meses/anos disponíveis
+      // Popular filtro de mês específico com meses que têm dados detalhados (rawData)
       const specificMonthSel = document.getElementById('specificMonthFilter');
       if (specificMonthSel) {
         const prevSpecificMonth = specificMonthSel.value || '';
@@ -1213,7 +1250,13 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         ];
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        fillFilters(); await loadAuxSheet(); document.getElementById('loadingMsg').style.display='none'; processVencimentoData(); setTimeout(()=>updateDashboard(),100); return;
+        // Aguarda loadAuxSheet completar ANTES de chamar fillFilters
+        await loadAuxSheet(); 
+        fillFilters(); 
+        document.getElementById('loadingMsg').style.display='none'; 
+        processVencimentoData(); 
+        setTimeout(()=>updateDashboard(),100); 
+        return;
       }
       try {
         document.getElementById('loadingMsg').style.display = 'block';
@@ -1276,7 +1319,12 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
         uniqueVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
         uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-        fillFilters(); await loadAuxSheet(); document.getElementById('loadingMsg').style.display='none'; processVencimentoData(); setTimeout(()=>updateDashboard(),100);
+        // Aguarda loadAuxSheet completar ANTES de chamar fillFilters (necessário para sincronizar meses)
+        await loadAuxSheet(); 
+        fillFilters(); 
+        document.getElementById('loadingMsg').style.display='none'; 
+        processVencimentoData(); 
+        setTimeout(()=>updateDashboard(),100);
       } catch (e) { 
         console.error('❌ Erro ao carregar dados:', e);
         // Usar dados de teste quando há erro
@@ -1287,8 +1335,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         ];
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        fillFilters(); 
+        // Aguarda loadAuxSheet completar ANTES de chamar fillFilters (necessário para sincronizar meses)
         await loadAuxSheet(); 
+        fillFilters(); 
         processVencimentoData(); 
         setTimeout(()=>updateDashboard(),100);
         document.getElementById('loadingMsg').innerHTML = `
