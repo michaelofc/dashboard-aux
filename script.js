@@ -418,7 +418,20 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
   let rawData = [], uniqueMonths = [], uniqueTeams = [], uniqueVendedores = [], uniqueSupervisores = [], inadEvolData = [], evolutionData = [];
-    // Expor globalmente para acesso de functions de sincronização
+    // Usar object getter para manter sincronização com window
+    Object.defineProperty(window, 'uniqueMonths_local', {
+      get() { return uniqueMonths; },
+      set(v) { uniqueMonths = v; }
+    });
+    Object.defineProperty(window, 'uniqueTeams_local', {
+      get() { return uniqueTeams; },
+      set(v) { uniqueTeams = v; }
+    });
+    Object.defineProperty(window, 'rawData_local', {
+      get() { return rawData; },
+      set(v) { rawData = v; }
+    });
+    // Atualizar referências iniciais
     window.uniqueMonths = uniqueMonths; window.uniqueTeams = uniqueTeams; window.uniqueVendedores = uniqueVendedores; 
     window.uniqueSupervisores = uniqueSupervisores; window.rawData = rawData;
     let charts = {}, evolutionChart = null, showingMonths = 6, showingProduction = false;
