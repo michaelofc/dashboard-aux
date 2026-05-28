@@ -418,6 +418,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
   let rawData = [], uniqueMonths = [], uniqueTeams = [], uniqueVendedores = [], uniqueSupervisores = [], inadEvolData = [], evolutionData = [];
+    // Expor globalmente para acesso de functions de sincronização
+    window.uniqueMonths = uniqueMonths; window.uniqueTeams = uniqueTeams; window.uniqueVendedores = uniqueVendedores; 
+    window.uniqueSupervisores = uniqueSupervisores; window.rawData = rawData;
     let charts = {}, evolutionChart = null, showingMonths = 6, showingProduction = false;
     let showingVencimentoPercentage = true, vencimentoData = [];
 
@@ -1294,7 +1297,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           { ata:'abr./25', ano:'2025', status:'CANCELADO', vencimento:'25', equipe:'EQUIPE B', vendedor:'C', cliente:'Z', valor:60000, contrato:'C3', telefone:'', dataVenda:new Date(2025,3,1) }
         ];
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        window.uniqueMonths = uniqueMonths;
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        window.uniqueTeams = uniqueTeams;
         // loadAuxSheet agora chama fillFilters internamente
         await loadAuxSheet(); 
         document.getElementById('loadingMsg').style.display='none'; 
@@ -1360,9 +1365,13 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           return { ata, ano: anoNorm, status, vencimento, equipe, vendedor, supervisor, cliente, valor, contrato, telefone, dataVenda };
         });
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        window.uniqueMonths = uniqueMonths;
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        window.uniqueTeams = uniqueTeams;
         uniqueVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+        window.uniqueVendedores = uniqueVendedores;
         uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+        window.uniqueSupervisores = uniqueSupervisores;
         // loadAuxSheet agora chama fillFilters internamente
         await loadAuxSheet();
         document.getElementById('loadingMsg').style.display='none'; 
@@ -1377,7 +1386,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           { ata:'abr./25', ano:'2025', status:'CANCELADO', vencimento:'25', equipe:'EQUIPE B', vendedor:'C', cliente:'Z', valor:60000, contrato:'C3', telefone:'', dataVenda:new Date(2025,3,1) }
         ];
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        window.uniqueMonths = uniqueMonths;
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        window.uniqueTeams = uniqueTeams;
         // loadAuxSheet agora chama fillFilters internamente
         await loadAuxSheet();
         processVencimentoData(); 
