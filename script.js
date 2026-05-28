@@ -1830,4 +1830,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
   // Inicialização do App
   document.addEventListener('DOMContentLoaded', () => App.init());
+  
+  // Expor fillFilters para o escopo global para sincronizar meses
+  window._appFillFilters = fillFilters;
+  window._appLoadSheetData = loadSheetData;
+  window._appUpdateDashboard = updateDashboard;
 })();
