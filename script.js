@@ -1290,10 +1290,23 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
         // Aguarda loadAuxSheet completar ANTES de chamar fillFilters
-        await loadAuxSheet(); 
-        // Adiciona um pequeno delay para garantir que inadEvolData foi preenchido
-        await new Promise(r => setTimeout(r, 100));
-        fillFilters(); 
+        try {
+          console.log('🟡 Iniciando loadAuxSheet (fallback)...');
+          await loadAuxSheet(); 
+          window.__loadAuxSheetCompleted = true;
+          console.log('🟢 loadAuxSheet completado (fallback)');
+          // Adiciona um pequeno delay para garantir que inadEvolData foi preenchido
+          await new Promise(r => setTimeout(r, 100));
+          window.__beforeFillFilters = true;
+          console.log('🟡 Chamando fillFilters (fallback)...');
+          fillFilters(); 
+          window.__afterFillFilters = true;
+          console.log('🟢 fillFilters completado (fallback)');
+        } catch (auxErr) {
+          console.error('❌ Erro sincronizando meses (fallback):', auxErr);
+          window.__auxError = String(auxErr);
+          try { fillFilters(); } catch(e) { console.error('❌ Erro em fillFilters (fallback):', e); }
+        }
         document.getElementById('loadingMsg').style.display='none'; 
         processVencimentoData(); 
         setTimeout(()=>updateDashboard(),100); 
