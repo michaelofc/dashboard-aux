@@ -1357,13 +1357,24 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         uniqueVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
         uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
         // Aguarda loadAuxSheet completar ANTES de chamar fillFilters (necessário para sincronizar meses)
-        await loadAuxSheet(); 
-        window.__loadAuxSheetCompleted = true;
-        // Adiciona um pequeno delay para garantir que inadEvolData foi preenchido
-        await new Promise(r => setTimeout(r, 100));
-        window.__beforeFillFilters = true;
-        fillFilters();
-        window.__afterFillFilters = true; 
+        try {
+          console.log('🟡 Iniciando loadAuxSheet...');
+          await loadAuxSheet(); 
+          window.__loadAuxSheetCompleted = true;
+          console.log('🟢 loadAuxSheet completado');
+          // Adiciona um pequeno delay para garantir que inadEvolData foi preenchido
+          await new Promise(r => setTimeout(r, 100));
+          window.__beforeFillFilters = true;
+          console.log('🟡 Chamando fillFilters...');
+          fillFilters();
+          window.__afterFillFilters = true;
+          console.log('🟢 fillFilters completado');
+        } catch (auxErr) {
+          console.error('❌ Erro sincronizando meses:', auxErr);
+          window.__auxError = String(auxErr);
+          // Tenta chamar fillFilters mesmo assim
+          try { fillFilters(); } catch(e) { console.error('❌ Erro em fillFilters:', e); }
+        } 
         document.getElementById('loadingMsg').style.display='none'; 
         processVencimentoData(); 
         setTimeout(()=>updateDashboard(),100);
@@ -1378,11 +1389,21 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
         // Aguarda loadAuxSheet completar ANTES de chamar fillFilters (necessário para sincronizar meses)
-        await loadAuxSheet(); 
-        window.__loadAuxSheetCompleted = true;
-        window.__beforeFillFilters = true;
-        fillFilters();
-        window.__afterFillFilters = true; 
+        try {
+          console.log('🟡 Iniciando loadAuxSheet (erro fallback)...');
+          await loadAuxSheet(); 
+          window.__loadAuxSheetCompleted = true;
+          console.log('🟢 loadAuxSheet completado (erro fallback)');
+          window.__beforeFillFilters = true;
+          console.log('🟡 Chamando fillFilters (erro fallback)...');
+          fillFilters();
+          window.__afterFillFilters = true;
+          console.log('🟢 fillFilters completado (erro fallback)');
+        } catch (auxErr) {
+          console.error('❌ Erro sincronizando meses (catch):', auxErr);
+          window.__auxError = String(auxErr);
+          try { fillFilters(); } catch(e) { console.error('❌ Erro em fillFilters (catch):', e); }
+        } 
         processVencimentoData(); 
         setTimeout(()=>updateDashboard(),100);
         document.getElementById('loadingMsg').innerHTML = `
