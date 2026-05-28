@@ -677,18 +677,35 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       
       // Sincronizar meses para "Mês Referência": combinar rawData (uniqueMonths) com inadEvolData (aba auxiliar)
       console.log('📋 fillFilters chamado:', { uniqueMonths: uniqueMonths.length, inadEvolData: inadEvolData.length });
-      let allAvailableMonths = [...uniqueMonths];
+      
+      // Criar lista de todos os meses: rawData + inadEvolData
+      const allMonthsSet = new Set([...uniqueMonths]);
+      
+      // Converter meses da inadEvolData (formato "mês./ano") para YYYY-MM
       if (inadEvolData && inadEvolData.length > 0) {
         console.log('🔄 Sincronizando meses: inadEvolData tem', inadEvolData.length, 'registros');
-        const evoMonths = inadEvolData
-          .map(e => convertAtaToYYYYMM(e.ata))
-          .filter(m => m !== null);
-        console.log('✅ Meses da evolução extraídos:', evoMonths);
-        allAvailableMonths = mergeAllAvailableMonths(uniqueMonths, evoMonths);
-        console.log('📊 Meses totais após sincronização:', allAvailableMonths);
+        const mesMap = { 'jan': '01','fev': '02','mar': '03','abr': '04','mai': '05','jun': '06','jul': '07','ago': '08','set': '09','out': '10','nov': '11','dez': '12' };
+        
+        inadEvolData.forEach(evolItem => {
+          const ataStr = evolItem.ata || '';
+          const match = ataStr.match(/(\w{3})\D*(\d{1,4})/i);
+          if (match) {
+            const monthCode = (match[1] || '').toLowerCase();
+            const monthNum = mesMap[monthCode];
+            let year = Number(match[2]);
+            if (!monthNum || !year) return;
+            if (year < 100) year = 2000 + year;
+            const yyyyMm = `${year}-${monthNum}`;
+            allMonthsSet.add(yyyyMm);
+            console.log(`  Convertido: ${ataStr} → ${yyyyMm}`);
+          }
+        });
       } else {
         console.log('⚠️ Sem dados de evolução, usando apenas rawData');
       }
+      
+      const allAvailableMonths = Array.from(allMonthsSet).sort((a, b) => b.localeCompare(a));
+      console.log('📊 Total de meses após sincronização:', allAvailableMonths.length, '→', allAvailableMonths);
       
       monthSel.innerHTML=''; 
       allAvailableMonths.forEach(m=>{ 
