@@ -177,8 +177,8 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             <select id="monthSelect"></select>
           </div>
           <div class="control-group">
-            <label for="specificMonthFilter">Filtro Mês Específico:</label>
-            <select id="specificMonthFilter"><option value="">Sem filtro</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select>
+            <label for="specificMonthFilter">Filtro Mês Específico (Ano/Mês):</label>
+            <select id="specificMonthFilter"><option value="">Sem filtro</option></select>
           </div>
           <div class="control-group">
             <label for="teamFilter">Equipe:</label>
@@ -661,6 +661,24 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       // sincronizar estado e notificar
       window.AppState.uniqueMonths = uniqueMonths;
       window.AppState.selectedMonth = monthSel.value || '';
+      
+      // Popular filtro de mês específico com todos os meses/anos disponíveis
+      const specificMonthSel = document.getElementById('specificMonthFilter');
+      if (specificMonthSel) {
+        const prevSpecificMonth = specificMonthSel.value || '';
+        specificMonthSel.innerHTML = '<option value="">Sem filtro</option>';
+        uniqueMonths.forEach(m => {
+          const [ano, mes] = m.split('-');
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = `${getMonthName(Number(mes))} / ${ano}`;
+          specificMonthSel.appendChild(opt);
+        });
+        if (prevSpecificMonth && uniqueMonths.includes(prevSpecificMonth)) {
+          specificMonthSel.value = prevSpecificMonth;
+        }
+      }
+      
       const teamSel = document.getElementById('teamFilter');
       if (teamSel) {
         const prevTeam = teamSel.value || '';
@@ -698,7 +716,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const selectedMonth = document.getElementById('monthSelect')?.value; const selectedTeam = document.getElementById('teamFilter')?.value; const selectedVendedor = document.getElementById('vendedorFilter')?.value; const specificMonth = document.getElementById('specificMonthFilter')?.value;
       let filteredData = rawData;
       if (selectedMonth) { const [anoRef, mesRef] = selectedMonth.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini: dataIni, fim: dataFim} = getPeriodo82(dataRef); filteredData = filteredData.filter(item => item.dataVenda >= dataIni && item.dataVenda <= dataFim); }
-      if (specificMonth) { const monthNum = Number(specificMonth); filteredData = filteredData.filter(item => { const itemMonth = new Date(item.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
+      if (specificMonth) { filteredData = filteredData.filter(item => { const itemYear = item.ano; const itemMonth = String(item.dataVenda.getMonth() + 1).padStart(2, '0'); const itemYearMonth = `${itemYear}-${itemMonth}`; return itemYearMonth === specificMonth; }); }
       if (selectedTeam) filteredData = filteredData.filter(item => item.equipe && item.equipe.toLowerCase() === selectedTeam.toLowerCase());
       if (selectedVendedor) filteredData = filteredData.filter(item => item.vendedor && item.vendedor.toLowerCase() === selectedVendedor.toLowerCase());
       const grupos = { '10': { total:0, inadimplente:0, contratos:0 }, '15': { total:0, inadimplente:0, contratos:0 }, '20': { total:0, inadimplente:0, contratos:0 }, '25': { total:0, inadimplente:0, contratos:0 } };
@@ -737,7 +755,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const [anoRef, mesRef] = monthRef.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini:dataIni, fim:dataFim} = getPeriodo82(dataRef);
       const inadSet = new Set(['ATRASADO','EM ATRASO','CANCELADO','INADIMPLENTE','VENCIDO']);
       let periodData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
-      if (specificMonth) { const monthNum = Number(specificMonth); periodData = periodData.filter(r => { const itemMonth = new Date(r.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
+      if (specificMonth) { periodData = periodData.filter(r => { const rYear = r.ano; const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0'); const rYearMonth = `${rYear}-${rMonth}`; return rYearMonth === specificMonth; }); }
       const totalVendas = periodData.reduce((s,r) => s + (Number(r.valor)||0), 0);
       const rows = periodData.filter(r => {
         const st = String(r.status||'').toUpperCase();
@@ -1040,7 +1058,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
   window.AppState.periodo82Text = periodoTexto;
   document.dispatchEvent(new CustomEvent('app:monthsUpdated', { detail: { uniqueMonths: window.AppState.uniqueMonths, selectedMonth: window.AppState.selectedMonth, periodo82Text: window.AppState.periodo82Text, sheetUrl: window.AppState.sheetUrl } }));
       let dataFiltrada = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
-      if (specificMonth) { const monthNum = Number(specificMonth); dataFiltrada = dataFiltrada.filter(r => { const itemMonth = new Date(r.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
+      if (specificMonth) { dataFiltrada = dataFiltrada.filter(r => { const rYear = r.ano; const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0'); const rYearMonth = `${rYear}-${rMonth}`; return rYearMonth === specificMonth; }); }
       const totalVendas = dataFiltrada.reduce((acc,r)=>acc+r.valor,0);
       processVencimentoData();
       const totalAtrasado = dataFiltrada.filter(r=>r.status==='ATRASADO').reduce((acc,r)=>acc+r.valor,0);
@@ -1086,7 +1104,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       // Agrupar por equipe no período
       const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
       let teamData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.equipe);
-      if (specificMonth) { const monthNum = Number(specificMonth); teamData = teamData.filter(r => { const itemMonth = new Date(r.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
+      if (specificMonth) { teamData = teamData.filter(r => { const rYear = r.ano; const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0'); const rYearMonth = `${rYear}-${rMonth}`; return rYearMonth === specificMonth; }); }
       const teamMap = new Map();
       teamData.forEach(r => {
         const key = r.equipe;
@@ -1133,7 +1151,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         && (!team || (r.equipe && r.equipe.toLowerCase() === team.toLowerCase()))
         && (!vendedorFilter || (r.vendedor.toLowerCase() === vendedorFilter.toLowerCase()))
       );
-      if (specificMonth) { const monthNum = Number(specificMonth); vendorData = vendorData.filter(r => { const itemMonth = new Date(r.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
+      if (specificMonth) { vendorData = vendorData.filter(r => { const rYear = r.ano; const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0'); const rYearMonth = `${rYear}-${rMonth}`; return rYearMonth === specificMonth; }); }
       const vendorMap = new Map();
       vendorData.forEach(r => {
         const key = r.vendedor;
