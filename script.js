@@ -1263,7 +1263,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           }
           if (!dataVenda) dataVenda = parseDateFromAta(ata, ano);
           if (!(dataVenda instanceof Date) || isNaN(dataVenda)) dataVenda = new Date();
-          return { ata, ano: ano || String(dataVenda.getFullYear()), status, vencimento, equipe, vendedor, supervisor, cliente, valor, contrato, telefone, dataVenda };
+          // Corrige ano para sempre ser 4-dígitos (YYYY)
+          let anoNorm = String(dataVenda.getFullYear());
+          if (ano) {
+            const anoNum = Number(ano);
+            if (anoNum >= 0 && anoNum <= 99) anoNorm = String(2000 + anoNum);
+            else if (anoNum >= 100) anoNorm = String(anoNum);
+          }
+          return { ata, ano: anoNorm, status, vencimento, equipe, vendedor, supervisor, cliente, valor, contrato, telefone, dataVenda };
         });
         uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
