@@ -461,7 +461,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     async function loadAuxSheet() {
       try {
         if (!SHEET_CSV_URL) { // fallback
-          inadEvolData = [
+          const newEvol = [
             { ata: 'nov./24', inad: 0.3915, producao: 16.13 },
             { ata: 'dez./24', inad: 0.3722, producao: 19.34 },
             { ata: 'jan./25', inad: 0.3483, producao: 6.34 },
@@ -471,6 +471,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
             { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
           ];
+          inadEvolData.length = 0; inadEvolData.push(...newEvol);
           evolutionData = inadEvolData; window.inadEvolData = inadEvolData; 
           try { createEvolutionChart(); } catch(e) { console.error('❌ Erro createEvolutionChart:', e); }
           try { updateEvolutionInsights(); } catch(e) { console.error('❌ Erro updateEvolutionInsights:', e); }
@@ -490,19 +491,20 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         const csv = await resp.text();
         let arr = csvToArray(csv, ';');
         if (arr[0].length <= 1) arr = csvToArray(csv, ',');
-        inadEvolData = arr.slice(1).map(row => {
+        const parsed = arr.slice(1).map(row => {
           const mes = row[0]?.trim(); if (!mes || mes==='Mês') return null;
           const inadStr = (row[1]||'').toString().replace('%','').replace(',','.');
           const prodStr = (row[2]||'').toString().replace(/[^\d,]/g,'').replace(',','.');
           return { ata: mes, inad: parseFloat(inadStr)/100||0, producao: parseFloat(prodStr)/1000000||0 };
         }).filter(Boolean);
+        inadEvolData.length = 0; inadEvolData.push(...parsed);
         evolutionData = inadEvolData; window.inadEvolData = inadEvolData; 
         try { createEvolutionChart(); } catch(e) { console.error('❌ Erro createEvolutionChart:', e); }
         try { updateEvolutionInsights(); } catch(e) { console.error('❌ Erro updateEvolutionInsights:', e); }
         try { fillFilters(); } catch(e) { console.error('❌ Erro fillFilters (real):', e); }
       } catch(e) {
         console.error('❌ Erro em loadAuxSheet:', e);
-        inadEvolData = [
+        const newEvol = [
           { ata: 'nov./24', inad: 0.3915, producao: 16.13 },
           { ata: 'dez./24', inad: 0.3722, producao: 19.34 },
           { ata: 'jan./25', inad: 0.3483, producao: 6.34 },
@@ -512,7 +514,11 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
           { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
         ];
-        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
+        inadEvolData.length = 0; inadEvolData.push(...newEvol);
+        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; 
+        try { createEvolutionChart(); } catch(e) { console.error('❌ Erro createEvolutionChart:', e); }
+        try { updateEvolutionInsights(); } catch(e) { console.error('❌ Erro updateEvolutionInsights:', e); }
+        try { fillFilters(); } catch(e) { console.error('❌ Erro fillFilters (fallback):', e); }
       }
     }
 
@@ -1304,15 +1310,16 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (!SHEET_CSV_URL) {
         console.log('🔵 Usando dados de TESTE (fallback)');
         // Dados de teste mínimos
-        rawData = [
+        const newData = [
           { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, contrato:'C1', telefone:'', dataVenda:new Date(2025,1,1) },
           { ata:'mar./25', ano:'2025', status:'ATRASADO', vencimento:'20', equipe:'EQUIPE A', vendedor:'B', cliente:'Y', valor:45000, contrato:'C2', telefone:'', dataVenda:new Date(2025,2,1) },
           { ata:'abr./25', ano:'2025', status:'CANCELADO', vencimento:'25', equipe:'EQUIPE B', vendedor:'C', cliente:'Z', valor:60000, contrato:'C3', telefone:'', dataVenda:new Date(2025,3,1) }
         ];
-        uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
-        window.uniqueMonths = uniqueMonths;
-        uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        window.uniqueTeams = uniqueTeams;
+        rawData.length = 0; rawData.push(...newData);
+        const newMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        uniqueMonths.length = 0; uniqueMonths.push(...newMonths);
+        const newTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        uniqueTeams.length = 0; uniqueTeams.push(...newTeams);
         // loadAuxSheet agora chama fillFilters internamente
         await loadAuxSheet(); 
         document.getElementById('loadingMsg').style.display='none'; 
@@ -1377,14 +1384,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           }
           return { ata, ano: anoNorm, status, vencimento, equipe, vendedor, supervisor, cliente, valor, contrato, telefone, dataVenda };
         });
-        uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
-        window.uniqueMonths = uniqueMonths;
-        uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        window.uniqueTeams = uniqueTeams;
-        uniqueVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-        window.uniqueVendedores = uniqueVendedores;
-        uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-        window.uniqueSupervisores = uniqueSupervisores;
+        const newMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        uniqueMonths.length = 0; uniqueMonths.push(...newMonths);
+        const newTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        uniqueTeams.length = 0; uniqueTeams.push(...newTeams);
+        const newVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+        uniqueVendedores.length = 0; uniqueVendedores.push(...newVendedores);
+        const newSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+        uniqueSupervisores.length = 0; uniqueSupervisores.push(...newSupervisores);
         // loadAuxSheet agora chama fillFilters internamente
         await loadAuxSheet();
         document.getElementById('loadingMsg').style.display='none'; 
@@ -1393,15 +1400,16 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       } catch (e) { 
         console.error('❌ Erro ao carregar dados:', e);
         // Usar dados de teste quando há erro
-        rawData = [
+        const newData = [
           { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, contrato:'C1', telefone:'', dataVenda:new Date(2025,1,1) },
           { ata:'mar./25', ano:'2025', status:'ATRASADO', vencimento:'20', equipe:'EQUIPE A', vendedor:'B', cliente:'Y', valor:45000, contrato:'C2', telefone:'', dataVenda:new Date(2025,2,1) },
           { ata:'abr./25', ano:'2025', status:'CANCELADO', vencimento:'25', equipe:'EQUIPE B', vendedor:'C', cliente:'Z', valor:60000, contrato:'C3', telefone:'', dataVenda:new Date(2025,3,1) }
         ];
-        uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
-        window.uniqueMonths = uniqueMonths;
-        uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        window.uniqueTeams = uniqueTeams;
+        rawData.length = 0; rawData.push(...newData);
+        const newMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        uniqueMonths.length = 0; uniqueMonths.push(...newMonths);
+        const newTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        uniqueTeams.length = 0; uniqueTeams.push(...newTeams);
         // loadAuxSheet agora chama fillFilters internamente
         await loadAuxSheet();
         processVencimentoData(); 
