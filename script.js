@@ -673,13 +673,12 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     function fillFilters() {
+      window.__fillFiltersCallCount = (window.__fillFiltersCallCount || 0) + 1;
       const monthSel = document.getElementById('monthSelect'); if (!monthSel) return;
       
-      console.log('🚀 fillFilters START:', { 
+      console.log('🚀 fillFilters START #' + window.__fillFiltersCallCount + ':', { 
         uniqueMonths_length: uniqueMonths?.length || 0,
-        inadEvolData_global: typeof window.inadEvolData,
-        inadEvolData_length: window.inadEvolData?.length || 0,
-        inadEvolData_local: inadEvolData?.length || 0,
+        inadEvolData_local_length: inadEvolData?.length || 0,
         inadEvolData_first: inadEvolData?.[0]?.ata || 'VAZIO'
       });
       
