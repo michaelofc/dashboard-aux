@@ -1358,9 +1358,12 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
         // Aguarda loadAuxSheet completar ANTES de chamar fillFilters (necessário para sincronizar meses)
         await loadAuxSheet(); 
+        window.__loadAuxSheetCompleted = true;
         // Adiciona um pequeno delay para garantir que inadEvolData foi preenchido
         await new Promise(r => setTimeout(r, 100));
-        fillFilters(); 
+        window.__beforeFillFilters = true;
+        fillFilters();
+        window.__afterFillFilters = true; 
         document.getElementById('loadingMsg').style.display='none'; 
         processVencimentoData(); 
         setTimeout(()=>updateDashboard(),100);
@@ -1376,7 +1379,10 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
         // Aguarda loadAuxSheet completar ANTES de chamar fillFilters (necessário para sincronizar meses)
         await loadAuxSheet(); 
-        fillFilters(); 
+        window.__loadAuxSheetCompleted = true;
+        window.__beforeFillFilters = true;
+        fillFilters();
+        window.__afterFillFilters = true; 
         processVencimentoData(); 
         setTimeout(()=>updateDashboard(),100);
         document.getElementById('loadingMsg').innerHTML = `
