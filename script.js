@@ -177,6 +177,10 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             <select id="monthSelect"></select>
           </div>
           <div class="control-group">
+            <label for="specificMonthFilter">Filtro Mês Específico:</label>
+            <select id="specificMonthFilter"><option value="">Sem filtro</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select>
+          </div>
+          <div class="control-group">
             <label for="teamFilter">Equipe:</label>
             <select id="teamFilter"><option value="">Todas</option></select>
           </div>
@@ -691,9 +695,10 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
   function processVencimentoData() {
-      const selectedMonth = document.getElementById('monthSelect')?.value; const selectedTeam = document.getElementById('teamFilter')?.value; const selectedVendedor = document.getElementById('vendedorFilter')?.value;
+      const selectedMonth = document.getElementById('monthSelect')?.value; const selectedTeam = document.getElementById('teamFilter')?.value; const selectedVendedor = document.getElementById('vendedorFilter')?.value; const specificMonth = document.getElementById('specificMonthFilter')?.value;
       let filteredData = rawData;
       if (selectedMonth) { const [anoRef, mesRef] = selectedMonth.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini: dataIni, fim: dataFim} = getPeriodo82(dataRef); filteredData = filteredData.filter(item => item.dataVenda >= dataIni && item.dataVenda <= dataFim); }
+      if (specificMonth) { const monthNum = Number(specificMonth); filteredData = filteredData.filter(item => { const itemMonth = new Date(item.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
       if (selectedTeam) filteredData = filteredData.filter(item => item.equipe && item.equipe.toLowerCase() === selectedTeam.toLowerCase());
       if (selectedVendedor) filteredData = filteredData.filter(item => item.vendedor && item.vendedor.toLowerCase() === selectedVendedor.toLowerCase());
       const grupos = { '10': { total:0, inadimplente:0, contratos:0 }, '15': { total:0, inadimplente:0, contratos:0 }, '20': { total:0, inadimplente:0, contratos:0 }, '25': { total:0, inadimplente:0, contratos:0 } };
@@ -726,11 +731,13 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const monthRef = document.getElementById('monthSelect')?.value || uniqueMonths[uniqueMonths.length - 1];
       const team = document.getElementById('teamFilter')?.value || '';
       const vendedor = document.getElementById('vendedorFilter')?.value || '';
+      const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
       const statusFiltro = document.getElementById('statusFilter')?.value || '';
       if (!monthRef) return { rows: [], totalVendas: 0 };
       const [anoRef, mesRef] = monthRef.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini:dataIni, fim:dataFim} = getPeriodo82(dataRef);
       const inadSet = new Set(['ATRASADO','EM ATRASO','CANCELADO','INADIMPLENTE','VENCIDO']);
-      const periodData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
+      let periodData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
+      if (specificMonth) { const monthNum = Number(specificMonth); periodData = periodData.filter(r => { const itemMonth = new Date(r.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
       const totalVendas = periodData.reduce((s,r) => s + (Number(r.valor)||0), 0);
       const rows = periodData.filter(r => {
         const st = String(r.status||'').toUpperCase();
@@ -1021,6 +1028,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const monthRef = document.getElementById('monthSelect').value || uniqueMonths[uniqueMonths.length - 1];
       const team = document.getElementById('teamFilter').value;
       const vendedor = document.getElementById('vendedorFilter')?.value || '';
+      const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
       const [anoRef, mesRef] = monthRef.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini:dataIni, fim:dataFim} = getPeriodo82(dataRef);
       const proximoMes = new Date(dataRef); proximoMes.setMonth(dataRef.getMonth()+1); const {ini:dataIniProj, fim:dataFimProj} = getPeriodo82(proximoMes);
       const mesesNomes = ['', 'Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -1032,6 +1040,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
   window.AppState.periodo82Text = periodoTexto;
   document.dispatchEvent(new CustomEvent('app:monthsUpdated', { detail: { uniqueMonths: window.AppState.uniqueMonths, selectedMonth: window.AppState.selectedMonth, periodo82Text: window.AppState.periodo82Text, sheetUrl: window.AppState.sheetUrl } }));
       let dataFiltrada = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
+      if (specificMonth) { const monthNum = Number(specificMonth); dataFiltrada = dataFiltrada.filter(r => { const itemMonth = new Date(r.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
       const totalVendas = dataFiltrada.reduce((acc,r)=>acc+r.valor,0);
       processVencimentoData();
       const totalAtrasado = dataFiltrada.filter(r=>r.status==='ATRASADO').reduce((acc,r)=>acc+r.valor,0);
@@ -1075,8 +1084,11 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (!podiumEl || !listEl) return;
 
       // Agrupar por equipe no período
+      const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
+      let teamData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.equipe);
+      if (specificMonth) { const monthNum = Number(specificMonth); teamData = teamData.filter(r => { const itemMonth = new Date(r.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
       const teamMap = new Map();
-      rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.equipe).forEach(r => {
+      teamData.forEach(r => {
         const key = r.equipe;
         const agg = teamMap.get(key) || { nome: key, producao: 0, inadValor: 0 };
         agg.producao += r.valor;
@@ -1114,13 +1126,16 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
       const team = document.getElementById('teamFilter')?.value || '';
       const vendedorFilter = document.getElementById('vendedorFilter')?.value || '';
+      const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
 
       // Agrupar por vendedor no período
-      const vendorMap = new Map();
-      rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.vendedor
+      let vendorData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.vendedor
         && (!team || (r.equipe && r.equipe.toLowerCase() === team.toLowerCase()))
         && (!vendedorFilter || (r.vendedor.toLowerCase() === vendedorFilter.toLowerCase()))
-      ).forEach(r => {
+      );
+      if (specificMonth) { const monthNum = Number(specificMonth); vendorData = vendorData.filter(r => { const itemMonth = new Date(r.dataVenda).getMonth() + 1; return itemMonth === monthNum; }); }
+      const vendorMap = new Map();
+      vendorData.forEach(r => {
         const key = r.vendedor;
         const agg = vendorMap.get(key) || { nome: key, equipe: r.equipe || '', producao: 0, inadValor: 0 };
         agg.producao += r.valor;
@@ -1275,10 +1290,11 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     function bindUI() {
-  const monthSelect = document.getElementById('monthSelect'); const teamFilter = document.getElementById('teamFilter'); const vendedorFilter = document.getElementById('vendedorFilter'); const refreshBtn = document.getElementById('refreshBtn');
+  const monthSelect = document.getElementById('monthSelect'); const teamFilter = document.getElementById('teamFilter'); const vendedorFilter = document.getElementById('vendedorFilter'); const specificMonthFilter = document.getElementById('specificMonthFilter'); const refreshBtn = document.getElementById('refreshBtn');
       if (monthSelect) monthSelect.addEventListener('change', updateDashboard);
   if (teamFilter) teamFilter.addEventListener('change', ()=>{ populateVendedores(); updateDashboard(); });
   if (vendedorFilter) vendedorFilter.addEventListener('change', updateDashboard);
+  if (specificMonthFilter) specificMonthFilter.addEventListener('change', updateDashboard);
   if (refreshBtn) refreshBtn.onclick = async () => { try { refreshBtn.disabled = true; refreshBtn.textContent = 'Atualizando...'; await loadSheetData(); } finally { refreshBtn.disabled = false; refreshBtn.textContent = 'Atualizar Dados'; } };
   const btnPdf = document.getElementById('btnExportPdf');
   if (btnPdf) btnPdf.addEventListener('click', exportInadReportPdf);
