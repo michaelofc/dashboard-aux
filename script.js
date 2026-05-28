@@ -676,12 +676,18 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const monthSel = document.getElementById('monthSelect'); if (!monthSel) return;
       
       // Sincronizar meses para "Mês Referência": combinar rawData (uniqueMonths) com inadEvolData (aba auxiliar)
+      console.log('📋 fillFilters chamado:', { uniqueMonths: uniqueMonths.length, inadEvolData: inadEvolData.length });
       let allAvailableMonths = [...uniqueMonths];
       if (inadEvolData && inadEvolData.length > 0) {
+        console.log('🔄 Sincronizando meses: inadEvolData tem', inadEvolData.length, 'registros');
         const evoMonths = inadEvolData
           .map(e => convertAtaToYYYYMM(e.ata))
           .filter(m => m !== null);
+        console.log('✅ Meses da evolução extraídos:', evoMonths);
         allAvailableMonths = mergeAllAvailableMonths(uniqueMonths, evoMonths);
+        console.log('📊 Meses totais após sincronização:', allAvailableMonths);
+      } else {
+        console.log('⚠️ Sem dados de evolução, usando apenas rawData');
       }
       
       monthSel.innerHTML=''; 
