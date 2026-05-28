@@ -455,7 +455,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
             { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
           ];
-          evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
+          evolutionData = inadEvolData; window.inadEvolData = inadEvolData; 
+          try { createEvolutionChart(); } catch(e) { console.error('❌ Erro createEvolutionChart:', e); }
+          try { updateEvolutionInsights(); } catch(e) { console.error('❌ Erro updateEvolutionInsights:', e); }
           return;
         }
         const GID_AUX = '2018703213';
@@ -477,7 +479,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           const prodStr = (row[2]||'').toString().replace(/[^\d,]/g,'').replace(',','.');
           return { ata: mes, inad: parseFloat(inadStr)/100||0, producao: parseFloat(prodStr)/1000000||0 };
         }).filter(Boolean);
-        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
+        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; 
+        try { createEvolutionChart(); } catch(e) { console.error('❌ Erro createEvolutionChart:', e); }
+        try { updateEvolutionInsights(); } catch(e) { console.error('❌ Erro updateEvolutionInsights:', e); }
       } catch(e) {
         console.error('❌ Erro em loadAuxSheet:', e);
         inadEvolData = [
