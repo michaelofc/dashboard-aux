@@ -1278,7 +1278,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
     async function loadSheetData() {
       const saveEl = document.getElementById('saveSheetUrl'); const inputEl = document.getElementById('sheetUrlInput'); if (inputEl) inputEl.value = localStorage.getItem('sheetUrl') || '';
+      console.log('🔵 loadSheetData iniciado. SHEET_CSV_URL:', !!SHEET_CSV_URL);
       if (!SHEET_CSV_URL) {
+        console.log('🔵 Usando dados de TESTE (fallback)');
         // Dados de teste mínimos
         rawData = [
           { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, contrato:'C1', telefone:'', dataVenda:new Date(2025,1,1) },
