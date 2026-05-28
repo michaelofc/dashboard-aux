@@ -675,6 +675,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     function fillFilters() {
       const monthSel = document.getElementById('monthSelect'); if (!monthSel) return;
       
+      console.log('🚀 fillFilters START:', { 
+        uniqueMonths_length: uniqueMonths?.length || 0,
+        inadEvolData_global: typeof window.inadEvolData,
+        inadEvolData_length: window.inadEvolData?.length || 0,
+        inadEvolData_local: inadEvolData?.length || 0,
+        inadEvolData_first: inadEvolData?.[0]?.ata || 'VAZIO'
+      });
+      
       // Sincronizar meses para "Mês Referência": combinar rawData (uniqueMonths) com inadEvolData (aba auxiliar)
       console.log('📋 fillFilters chamado:', { uniqueMonths: uniqueMonths.length, inadEvolData: inadEvolData.length });
       
@@ -686,22 +694,27 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         console.log('🔄 Sincronizando meses: inadEvolData tem', inadEvolData.length, 'registros');
         const mesMap = { 'jan': '01','fev': '02','mar': '03','abr': '04','mai': '05','jun': '06','jul': '07','ago': '08','set': '09','out': '10','nov': '11','dez': '12' };
         
-        inadEvolData.forEach(evolItem => {
+        inadEvolData.forEach((evolItem, idx) => {
           const ataStr = evolItem.ata || '';
           const match = ataStr.match(/(\w{3})\D*(\d{1,4})/i);
           if (match) {
             const monthCode = (match[1] || '').toLowerCase();
             const monthNum = mesMap[monthCode];
             let year = Number(match[2]);
-            if (!monthNum || !year) return;
+            if (!monthNum || !year) {
+              console.log(`  ⚠️ [${idx}] Falhou: ${ataStr} - monthNum=${monthNum}, year=${year}`);
+              return;
+            }
             if (year < 100) year = 2000 + year;
             const yyyyMm = `${year}-${monthNum}`;
             allMonthsSet.add(yyyyMm);
-            console.log(`  Convertido: ${ataStr} → ${yyyyMm}`);
+            console.log(`  ✅ [${idx}] Convertido: ${ataStr} → ${yyyyMm}`);
+          } else {
+            console.log(`  ❌ [${idx}] FALHOU REGEX: ${ataStr}`);
           }
         });
       } else {
-        console.log('⚠️ Sem dados de evolução, usando apenas rawData');
+        console.log('⚠️ Sem dados de evolução:', { inadEvolData_is_null: inadEvolData == null, inadEvolData_length: inadEvolData?.length || 0 });
       }
       
       const allAvailableMonths = Array.from(allMonthsSet).sort((a, b) => b.localeCompare(a));
