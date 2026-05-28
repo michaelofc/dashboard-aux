@@ -443,53 +443,56 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     async function loadAuxSheet() {
-      if (!SHEET_CSV_URL) { // fallback
-        inadEvolData = [
-          { ata: 'nov./24', inad: 0.3915, producao: 16.13 },
-          { ata: 'dez./24', inad: 0.3722, producao: 19.34 },
-          { ata: 'jan./25', inad: 0.3483, producao: 6.34 },
-          { ata: 'fev./25', inad: 0.3767, producao: 13.76 },
-          { ata: 'mar./25', inad: 0.3320, producao: 8.15 },
-          { ata: 'abr./25', inad: 0.2457, producao: 14.18 },
-          { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
-          { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
-        ];
-        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights(); return;
-      }
-      const GID_AUX = '2018703213';
-      let url = SHEET_CSV_URL.replace(/gid=\d+/, 'gid='+GID_AUX); if (!/gid=\d+/.test(url)) url += (url.includes('?')?'&':'?') + 'gid='+GID_AUX;
-      try {
-        // Usar proxy do backend para evitar CORS na Vercel
-        const baseUrl = window.location.origin;
-        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(url);
-        console.log('📊 Carregando aba auxiliar via proxy:', proxyUrl);
-        const resp = await fetch(proxyUrl);
-        if (!resp.ok) throw new Error('Erro ao buscar aba Dados_Auxiliares');
-        console.log('✅ Aba auxiliar carregada com sucesso');
-        const csv = await resp.text();
-        let arr = csvToArray(csv, ';');
-        if (arr[0].length <= 1) arr = csvToArray(csv, ',');
-        inadEvolData = arr.slice(1).map(row => {
-          const mes = row[0]?.trim(); if (!mes || mes==='Mês') return null;
-          const inadStr = (row[1]||'').toString().replace('%','').replace(',','.');
-          const prodStr = (row[2]||'').toString().replace(/[^\d,]/g,'').replace(',','.');
-          return { ata: mes, inad: parseFloat(inadStr)/100||0, producao: parseFloat(prodStr)/1000000||0 };
-        }).filter(Boolean);
-        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
-      } catch(e) {
-        console.error(e); // fallback
-        inadEvolData = [
-          { ata: 'nov./24', inad: 0.3915, producao: 16.13 },
-          { ata: 'dez./24', inad: 0.3722, producao: 19.34 },
-          { ata: 'jan./25', inad: 0.3483, producao: 6.34 },
-          { ata: 'fev./25', inad: 0.3767, producao: 13.76 },
-          { ata: 'mar./25', inad: 0.3320, producao: 8.15 },
-          { ata: 'abr./25', inad: 0.2457, producao: 14.18 },
-          { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
-          { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
-        ];
-        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
-      }
+      return new Promise((resolve, reject) => {
+        try {
+          if (!SHEET_CSV_URL) { // fallback
+            inadEvolData = [
+              { ata: 'nov./24', inad: 0.3915, producao: 16.13 },
+              { ata: 'dez./24', inad: 0.3722, producao: 19.34 },
+              { ata: 'jan./25', inad: 0.3483, producao: 6.34 },
+              { ata: 'fev./25', inad: 0.3767, producao: 13.76 },
+              { ata: 'mar./25', inad: 0.3320, producao: 8.15 },
+              { ata: 'abr./25', inad: 0.2457, producao: 14.18 },
+              { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
+              { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
+            ];
+            evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
+            resolve();
+            return;
+          }
+          const GID_AUX = '2018703213';
+          let url = SHEET_CSV_URL.replace(/gid=\d+/, 'gid='+GID_AUX); if (!/gid=\d+/.test(url)) url += (url.includes('?')?'&':'?') + 'gid='+GID_AUX;
+          
+          (async () => {
+            try {
+              // Usar proxy do backend para evitar CORS na Vercel
+              const baseUrl = window.location.origin;
+              const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(url);
+              console.log('📊 Carregando aba auxiliar via proxy:', proxyUrl);
+              const resp = await fetch(proxyUrl);
+              if (!resp.ok) throw new Error('Erro ao buscar aba Dados_Auxiliares');
+              console.log('✅ Aba auxiliar carregada com sucesso');
+              const csv = await resp.text();
+              let arr = csvToArray(csv, ';');
+              if (arr[0].length <= 1) arr = csvToArray(csv, ',');
+              inadEvolData = arr.slice(1).map(row => {
+                const mes = row[0]?.trim(); if (!mes || mes==='Mês') return null;
+                const inadStr = (row[1]||'').toString().replace('%','').replace(',','.');
+                const prodStr = (row[2]||'').toString().replace(/[^\d,]/g,'').replace(',','.');
+                return { ata: mes, inad: parseFloat(inadStr)/100||0, producao: parseFloat(prodStr)/1000000||0 };
+              }).filter(Boolean);
+              evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
+              resolve();
+            } catch(e) {
+              console.error('❌ Erro em loadAuxSheet:', e);
+              reject(e);
+            }
+          })();
+        } catch(e) {
+          console.error('❌ Erro wrapper loadAuxSheet:', e);
+          reject(e);
+        }
+      }); // fallback
     }
 
     function createEvolutionChart() {
