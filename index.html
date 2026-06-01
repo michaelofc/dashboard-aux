@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; img-src 'self' data: https:; connect-src 'self' https://docs.google.com; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=()" />
     <title>Inadimplência 8-2 | Dashboard + Gamificação</title>
     <meta name="description" content="Dashboard e Gamificação de Inadimplência 8-2 com gráficos responsivos, filtros por período e equipe, e exportação em PDF." />
     <meta name="theme-color" content="#0f172a" />
@@ -34,8 +37,8 @@
   </head>
   <body>
     <!-- Efeitos especiais: parabéns e alerta (fora do container principal) -->
-    <div id="specialCongrats" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;pointer-events:none;"></div>
-    <div id="specialAlert" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;pointer-events:none;"></div>
+    <div id="specialCongrats" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;"></div>
+    <div id="specialAlert" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;"></div>
 
     <div class="container">
       <div class="header" style="margin-bottom: 16px;">
@@ -59,26 +62,16 @@
       <nav class="tabs" style="margin-top: -4px;">
         <button id="tabDashboard" class="tab-btn active"><i class="fas fa-chart-line"></i> Dashboard</button>
         <button id="tabGamificacao" class="tab-btn"><i class="fas fa-trophy"></i> Gamificação</button>
-        <button id="tabAdmin" class="tab-btn"><i class="fas fa-cog"></i> Admin</button>
       </nav>
 
+      <!-- Efeitos especiais: parabéns e alerta -->
+      <div id="specialCongrats" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;pointer-events:none;"></div>
+      <div id="specialAlert" style="display:none;position:fixed;z-index:9999;top:0;left:0;width:100vw;height:100vh;align-items:center;justify-content:center;pointer-events:none;"></div>
       <!-- Área de conteúdo dinâmico -->
       <div id="app"></div>
     </div>
 
-  <!-- Script para carregar API Client -->
-  <script type="module" src="frontend/api-loader.js?v=3"></script>
-  
-  <!-- Configurações -->
-  <script src="config.js?v=4"></script>
-  
-  <!-- Scripts principais -->
-  <script defer src="script.js?v=13"></script>
-  <script defer src="frontend/gamification.js?v=11"></script>
-  
-  <!-- Force no-cache para esses scripts -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
+  <!-- Script unificado -->
+  <script defer src="script.js"></script>
   </body>
 </html>

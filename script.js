@@ -122,9 +122,118 @@ function startConfetti(canvasId, danger) {
 }
 function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInterval); confettiInterval = null; }
 
+const PRIVACY_KEYS = {
+  SHEET_URL: 'sheetUrl',
+  SHEET_URL_SESSION: 'sheetUrlSession',
+  REMEMBER_SHEET_URL: 'rememberSheetUrl',
+  LGPD_CONSENT: 'lgpdConsentV1'
+};
+
+function getRememberSheetUrl() {
+  return localStorage.getItem(PRIVACY_KEYS.REMEMBER_SHEET_URL) === 'true';
+}
+
+function getStoredSheetUrl() {
+  if (getRememberSheetUrl()) return localStorage.getItem(PRIVACY_KEYS.SHEET_URL) || '';
+  return sessionStorage.getItem(PRIVACY_KEYS.SHEET_URL_SESSION) || '';
+}
+
+function setStoredSheetUrl(url, remember) {
+  const val = (url || '').trim();
+  sessionStorage.setItem(PRIVACY_KEYS.SHEET_URL_SESSION, val);
+  if (remember) {
+    localStorage.setItem(PRIVACY_KEYS.REMEMBER_SHEET_URL, 'true');
+    localStorage.setItem(PRIVACY_KEYS.SHEET_URL, val);
+  } else {
+    localStorage.setItem(PRIVACY_KEYS.REMEMBER_SHEET_URL, 'false');
+    localStorage.removeItem(PRIVACY_KEYS.SHEET_URL);
+  }
+}
+
+function clearLocalPrivacyData() {
+  sessionStorage.removeItem(PRIVACY_KEYS.SHEET_URL_SESSION);
+  localStorage.removeItem(PRIVACY_KEYS.SHEET_URL);
+  localStorage.removeItem(PRIVACY_KEYS.REMEMBER_SHEET_URL);
+  localStorage.removeItem(PRIVACY_KEYS.LGPD_CONSENT);
+}
+
+function hasLgpdConsent() {
+  return localStorage.getItem(PRIVACY_KEYS.LGPD_CONSENT) === 'true';
+}
+
+function setLgpdConsent(value) {
+  localStorage.setItem(PRIVACY_KEYS.LGPD_CONSENT, value ? 'true' : 'false');
+}
+
+function toPublishedCsvUrl(rawUrl) {
+  try {
+    const url = new URL((rawUrl || '').trim());
+    if (url.protocol !== 'https:') return '';
+    if (url.hostname !== 'docs.google.com') return '';
+    if (!url.pathname.includes('/spreadsheets/')) return '';
+
+    if (url.pathname.includes('/pubhtml')) {
+      url.pathname = url.pathname.replace('/pubhtml', '/pub');
+      url.searchParams.set('output', 'csv');
+      return url.toString();
+    }
+
+    if (url.pathname.endsWith('/pub')) {
+      url.searchParams.set('output', 'csv');
+      return url.toString();
+    }
+
+    if (url.searchParams.get('output') === 'csv') {
+      return url.toString();
+    }
+
+    return '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function secureAuthMe() {
+  try {
+    const resp = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' });
+    if (!resp.ok) return { authenticated: false };
+    return await resp.json();
+  } catch (_) {
+    return { authenticated: false };
+  }
+}
+
+async function secureAuthLogin(accessKey) {
+  const resp = await fetch('/api/auth/login', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accessKey })
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || 'login_failed');
+  return data;
+}
+
+async function secureAuthLogout() {
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    credentials: 'include'
+  }).catch(() => {});
+}
+
 (function () {
   // Estado compartilhado entre as abas
-  window.AppState = window.AppState || { sheetUrl: localStorage.getItem('sheetUrl') || '', uniqueMonths: [], selectedMonth: '', periodo82Text: '' };
+  window.AppState = window.AppState || { sheetUrl: getStoredSheetUrl() || '', uniqueMonths: [], selectedMonth: '', periodo82Text: '' };
   const App = {
     current: 'dashboard',
     el: null,
@@ -136,16 +245,13 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     bindTabs() {
       const btnDash = document.getElementById('tabDashboard');
       const btnGame = document.getElementById('tabGamificacao');
-      const btnAdmin = document.getElementById('tabAdmin');
       if (btnDash) btnDash.addEventListener('click', () => this.mount('dashboard'));
       if (btnGame) btnGame.addEventListener('click', () => this.mount('gamificacao'));
-      if (btnAdmin) btnAdmin.addEventListener('click', () => window.location.href = '/admin.html');
     },
     setActive(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       if (tab === 'dashboard') document.getElementById('tabDashboard')?.classList.add('active');
       if (tab === 'gamificacao') document.getElementById('tabGamificacao')?.classList.add('active');
-      if (tab === 'admin') document.getElementById('tabAdmin')?.classList.add('active');
     },
     mount(view) {
       if (!this.el) return;
@@ -171,14 +277,30 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           <input id="sheetUrlInput" type="text" placeholder="Cole o link publicado da planilha" style="padding:8px 10px; border-radius:8px; border:1px solid #e5e7eb; width:420px;" />
           <button id="saveSheetUrl" class="tab-btn" style="background:#0ea5e9;color:#fff;border:none;">Carregar</button>
         </div>
+        <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px; margin:-2px 0 10px 0; flex-wrap:wrap;">
+          <input id="accessKeyInput" type="password" placeholder="Chave de acesso da filial" style="padding:8px 10px; border-radius:8px; border:1px solid #334155; width:260px;" />
+          <button id="secureLoginBtn" class="tab-btn" style="background:#10b981;color:#fff;border:none;">Entrar (modo seguro)</button>
+          <button id="secureLogoutBtn" class="tab-btn" style="background:#64748b;color:#fff;border:none;display:none;">Sair</button>
+          <span id="secureStatus" style="font-size:.8rem;color:#94a3b8;">Não autenticado</span>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:16px;flex-wrap:wrap;margin:-4px 0 10px 0;font-size:.82rem;color:#cbd5e1;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="lgpdConsent" />
+            Declaro possuir base legal LGPD para tratar estes dados.
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="rememberSheetUrl" />
+            Lembrar URL neste navegador
+          </label>
+          <button id="clearLocalData" class="tab-btn" style="background:#334155;color:#fff;border:none;padding:6px 10px;">Limpar dados locais</button>
+        </div>
+        <div style="margin:-2px 0 12px 0;font-size:.78rem;color:#94a3b8;">
+          Segurança LGPD: a planilha é processada em memória no navegador e não deve conter dados desnecessários.
+        </div>
         <div class="controls">
           <div class="control-group">
             <label for="monthSelect">Mês Referência:</label>
             <select id="monthSelect"></select>
-          </div>
-          <div class="control-group">
-            <label for="specificMonthFilter">Filtro Mês Específico (Ano/Mês):</label>
-            <select id="specificMonthFilter"><option value="">Sem filtro</option></select>
           </div>
           <div class="control-group">
             <label for="teamFilter">Equipe:</label>
@@ -197,7 +319,6 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             </select>
           </div>
           <button id="btnExportPdf" class="tab-btn" style="background:#64748b;color:#fff;border:none;">Imprimir / PDF</button>
-          <button id="btnExportPdfApi" class="tab-btn" style="background:#f59e0b;color:#fff;border:none;">📄 PDF</button>
           <button id="refreshBtn" class="tab-btn" style="background:#e9bc29;color:#000;border:none;">Atualizar Dados</button>
         </div>
         <div style="margin-bottom:12px; font-size:1.05rem; color:#e2e8f0;">
@@ -210,7 +331,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
             <div class="metric-value" id="currentInadimplencia">-</div>
             <div class="metric-label">Inadimplência Atual</div>
             <div class="metric-trend slide-container" id="inadimplenciaTrend">
-              <div class="slide-content active" id="slideContent1">Meta: <span id="metaDisplay">25%</span> | Status: <span id="metaStatus">-</span></div>
+              <div class="slide-content active" id="slideContent1">Meta: 25% | Status: <span id="metaStatus">-</span></div>
               <div class="slide-content" id="slideContent2">Diferença: <span id="metaDiferenca">-</span></div>
             </div>
           </div>
@@ -242,7 +363,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
                 <h3 style="margin:0;font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,#00d4ff,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;display:flex;align-items:center;gap:8px;">
                   <i class="fas fa-chart-area" style="-webkit-text-fill-color:#00d4ff;font-size:1.1rem;"></i> Evolução da Inadimplência
                 </h3>
-                <p style="margin:4px 0 0 0;color:#94a3b8;font-size:0.85rem;">Histórico mensal · <span id="metaLabel">Meta 25%</span></p>
+                <p style="margin:4px 0 0 0;color:#94a3b8;font-size:0.85rem;">Histórico mensal · Meta 25%</p>
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button id="toggle6Months" class="evo-toggle active" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.15);color:#00d4ff;font-weight:600;font-size:0.8rem;cursor:pointer;transition:all .3s;">6M</button>
@@ -365,19 +486,15 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         <div class="statistics-section"><div class="statistics-container" id="statisticsContainer"></div></div>
         <div class="motivation-section"><div id="motivationText">Carregando mensagem motivacional...</div></div>
         <div class="loading" id="loadingMsg">Carregando dados regionais consolidados...</div>
-        
-        <!-- Gamificação do Usuário -->
-        <div id="gamificationContainer" style="margin-top: 30px; padding-top: 30px; border-top: 2px solid #e5e7eb;"></div>
       </div>`;
     }
   };
 
   // ===== Módulo Dashboard (extraído e reduzido a partir do script original) =====
   const Dashboard = (() => {
-    let sheetUrl = localStorage.getItem('sheetUrl');
-    let SHEET_CSV_URL = '';
-    if (sheetUrl && sheetUrl.includes('/pubhtml')) SHEET_CSV_URL = sheetUrl.replace('/pubhtml', '/pub') + '&output=csv';
-    else if (sheetUrl && sheetUrl.includes('output=csv')) SHEET_CSV_URL = sheetUrl;
+    let sheetUrl = getStoredSheetUrl();
+    let SHEET_CSV_URL = toPublishedCsvUrl(sheetUrl);
+    let secureSession = { authenticated: false, filialId: '' };
   // atualizar estado compartilhado
   window.AppState.sheetUrl = sheetUrl || '';
 
@@ -398,42 +515,8 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (y < 100) y = 2000 + y; // trata '25' -> 2025
       return new Date(y, Number(mes)-1, 1);
     }
-    
-    // Converte formato "jun./25" ou "jun/25" para "2025-06"
-    function convertAtaToYYYYMM(ata) {
-      const meses = { 'jan': '01','fev': '02','mar': '03','abr': '04','mai': '05','jun': '06','jul': '07','ago': '08','set': '09','out': '10','nov': '11','dez': '12' };
-      const match = (ata||'').match(/(\w{3})\D*(\d{1,4})/i);
-      if (!match) return null;
-      const m = meses[(match[1]||'').toLowerCase()] || null;
-      let y = Number(match[2]);
-      if (!m || !y) return null;
-      if (y < 100) y = 2000 + y;
-      return `${y}-${m}`;
-    }
-    
-    // Sincroniza meses de rawData E inadEvolData para criar lista completa
-    function mergeAllAvailableMonths(rawMonths, evoMonths) {
-      const allMonths = new Set([...rawMonths, ...evoMonths]);
-      return Array.from(allMonths).sort((a, b) => b.localeCompare(a));
-    }
 
   let rawData = [], uniqueMonths = [], uniqueTeams = [], uniqueVendedores = [], uniqueSupervisores = [], inadEvolData = [], evolutionData = [];
-    // Usar object getter para manter sincronização com window
-    Object.defineProperty(window, 'uniqueMonths_local', {
-      get() { return uniqueMonths; },
-      set(v) { uniqueMonths = v; }
-    });
-    Object.defineProperty(window, 'uniqueTeams_local', {
-      get() { return uniqueTeams; },
-      set(v) { uniqueTeams = v; }
-    });
-    Object.defineProperty(window, 'rawData_local', {
-      get() { return rawData; },
-      set(v) { rawData = v; }
-    });
-    // Atualizar referências iniciais
-    window.uniqueMonths = uniqueMonths; window.uniqueTeams = uniqueTeams; window.uniqueVendedores = uniqueVendedores; 
-    window.uniqueSupervisores = uniqueSupervisores; window.rawData = rawData;
     let charts = {}, evolutionChart = null, showingMonths = 6, showingProduction = false;
     let showingVencimentoPercentage = true, vencimentoData = [];
 
@@ -459,52 +542,32 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     async function loadAuxSheet() {
-      try {
-        if (!SHEET_CSV_URL) { // fallback
-          const newEvol = [
-            { ata: 'nov./24', inad: 0.3915, producao: 16.13 },
-            { ata: 'dez./24', inad: 0.3722, producao: 19.34 },
-            { ata: 'jan./25', inad: 0.3483, producao: 6.34 },
-            { ata: 'fev./25', inad: 0.3767, producao: 13.76 },
-            { ata: 'mar./25', inad: 0.3320, producao: 8.15 },
-            { ata: 'abr./25', inad: 0.2457, producao: 14.18 },
-            { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
-            { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
-          ];
-          inadEvolData.length = 0; inadEvolData.push(...newEvol);
-          evolutionData = inadEvolData; window.inadEvolData = inadEvolData; 
-          try { createEvolutionChart(); } catch(e) { console.error('❌ Erro createEvolutionChart:', e); }
-          try { updateEvolutionInsights(); } catch(e) { console.error('❌ Erro updateEvolutionInsights:', e); }
-          try { fillFilters(); } catch(e) { console.error('❌ Erro fillFilters (fallback):', e); }
+      if (secureSession.authenticated) {
+        try {
+          const secureResp = await fetch('/api/data?kind=aux', { method: 'GET', credentials: 'include' });
+          if (!secureResp.ok) throw new Error('Erro ao buscar dados auxiliares seguros');
+          const payload = await secureResp.json();
+          const csv = payload.csv || '';
+          let arr = csvToArray(csv, ';');
+          if (arr[0].length <= 1) arr = csvToArray(csv, ',');
+          inadEvolData = arr.slice(1).map(row => {
+            const mes = row[0]?.trim(); if (!mes || mes==='Mês') return null;
+            const inadStr = (row[1]||'').toString().replace('%','').replace(',','.');
+            const prodStr = (row[2]||'').toString().replace(/[^\d,]/g,'').replace(',','.');
+            return { ata: mes, inad: parseFloat(inadStr)/100||0, producao: parseFloat(prodStr)/1000000||0 };
+          }).filter(Boolean);
+          evolutionData = inadEvolData;
+          window.inadEvolData = inadEvolData;
+          createEvolutionChart();
+          updateEvolutionInsights();
           return;
+        } catch (e) {
+          console.error(e);
         }
-        const GID_AUX = '2018703213';
-        let url = SHEET_CSV_URL.replace(/gid=\d+/, 'gid='+GID_AUX); if (!/gid=\d+/.test(url)) url += (url.includes('?')?'&':'?') + 'gid='+GID_AUX;
-        
-        // Usar proxy do backend para evitar CORS na Vercel
-        const baseUrl = window.location.origin;
-        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(url);
-        console.log('📊 Carregando aba auxiliar via proxy:', proxyUrl);
-        const resp = await fetch(proxyUrl);
-        if (!resp.ok) throw new Error('Erro ao buscar aba Dados_Auxiliares');
-        console.log('✅ Aba auxiliar carregada com sucesso');
-        const csv = await resp.text();
-        let arr = csvToArray(csv, ';');
-        if (arr[0].length <= 1) arr = csvToArray(csv, ',');
-        const parsed = arr.slice(1).map(row => {
-          const mes = row[0]?.trim(); if (!mes || mes==='Mês') return null;
-          const inadStr = (row[1]||'').toString().replace('%','').replace(',','.');
-          const prodStr = (row[2]||'').toString().replace(/[^\d,]/g,'').replace(',','.');
-          return { ata: mes, inad: parseFloat(inadStr)/100||0, producao: parseFloat(prodStr)/1000000||0 };
-        }).filter(Boolean);
-        inadEvolData.length = 0; inadEvolData.push(...parsed);
-        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; 
-        try { createEvolutionChart(); } catch(e) { console.error('❌ Erro createEvolutionChart:', e); }
-        try { updateEvolutionInsights(); } catch(e) { console.error('❌ Erro updateEvolutionInsights:', e); }
-        try { fillFilters(); } catch(e) { console.error('❌ Erro fillFilters (real):', e); }
-      } catch(e) {
-        console.error('❌ Erro em loadAuxSheet:', e);
-        const newEvol = [
+      }
+
+      if (!SHEET_CSV_URL) { // fallback
+        inadEvolData = [
           { ata: 'nov./24', inad: 0.3915, producao: 16.13 },
           { ata: 'dez./24', inad: 0.3722, producao: 19.34 },
           { ata: 'jan./25', inad: 0.3483, producao: 6.34 },
@@ -514,11 +577,35 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
           { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
         ];
-        inadEvolData.length = 0; inadEvolData.push(...newEvol);
-        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; 
-        try { createEvolutionChart(); } catch(e) { console.error('❌ Erro createEvolutionChart:', e); }
-        try { updateEvolutionInsights(); } catch(e) { console.error('❌ Erro updateEvolutionInsights:', e); }
-        try { fillFilters(); } catch(e) { console.error('❌ Erro fillFilters (fallback):', e); }
+        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights(); return;
+      }
+      const GID_AUX = '2018703213';
+      let url = SHEET_CSV_URL.replace(/gid=\d+/, 'gid='+GID_AUX); if (!/gid=\d+/.test(url)) url += (url.includes('?')?'&':'?') + 'gid='+GID_AUX;
+      try {
+        const resp = await fetch(url + '&cache=' + Date.now()); if (!resp.ok) throw new Error('Erro ao buscar aba Dados_Auxiliares');
+        const csv = await resp.text();
+        let arr = csvToArray(csv, ';');
+        if (arr[0].length <= 1) arr = csvToArray(csv, ',');
+        inadEvolData = arr.slice(1).map(row => {
+          const mes = row[0]?.trim(); if (!mes || mes==='Mês') return null;
+          const inadStr = (row[1]||'').toString().replace('%','').replace(',','.');
+          const prodStr = (row[2]||'').toString().replace(/[^\d,]/g,'').replace(',','.');
+          return { ata: mes, inad: parseFloat(inadStr)/100||0, producao: parseFloat(prodStr)/1000000||0 };
+        }).filter(Boolean);
+        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
+      } catch(e) {
+        console.error(e); // fallback
+        inadEvolData = [
+          { ata: 'nov./24', inad: 0.3915, producao: 16.13 },
+          { ata: 'dez./24', inad: 0.3722, producao: 19.34 },
+          { ata: 'jan./25', inad: 0.3483, producao: 6.34 },
+          { ata: 'fev./25', inad: 0.3767, producao: 13.76 },
+          { ata: 'mar./25', inad: 0.3320, producao: 8.15 },
+          { ata: 'abr./25', inad: 0.2457, producao: 14.18 },
+          { ata: 'mai./25', inad: 0.2419, producao: 12.16 },
+          { ata: 'jun./25', inad: 0.2219, producao: 15.555 }
+        ];
+        evolutionData = inadEvolData; window.inadEvolData = inadEvolData; createEvolutionChart(); updateEvolutionInsights();
       }
     }
 
@@ -579,11 +666,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
       // Linha de meta apenas para inadimplência
       if (!showingProduction) {
-        // Buscar meta atual do localStorage
-        const currentMetaPercent = window.currentMetaPercent !== undefined ? window.currentMetaPercent : 25;
         datasets.push({
-          label: `Meta ${currentMetaPercent.toFixed(1)}%`,
-          data: chartData.map(() => currentMetaPercent),
+          label: 'Meta 25%',
+          data: chartData.map(() => 25),
           borderColor: '#fbbf24',
           borderWidth: 2,
           borderDash: [8, 4],
@@ -622,8 +707,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
               displayColors: true,
               callbacks: {
                 label: (ctx) => {
-                  const currentMetaPercent = window.currentMetaPercent !== undefined ? window.currentMetaPercent : 25;
-                  if (ctx.dataset.label.includes('Meta')) return `Meta: ${currentMetaPercent.toFixed(1)}%`;
+                  if (ctx.dataset.label === 'Meta 25%') return 'Meta: 25%';
                   const val = ctx.parsed.y;
                   let suffix = showingProduction ? ` R$ ${val.toFixed(2)}M` : ` ${val.toFixed(2)}%`;
                   const i = ctx.dataIndex;
@@ -703,84 +787,12 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     function fillFilters() {
-      window.__fillFiltersCallCount = (window.__fillFiltersCallCount || 0) + 1;
       const monthSel = document.getElementById('monthSelect'); if (!monthSel) return;
-      
-      console.log('🚀 fillFilters START #' + window.__fillFiltersCallCount + ':', { 
-        uniqueMonths_length: uniqueMonths?.length || 0,
-        inadEvolData_local_length: inadEvolData?.length || 0,
-        inadEvolData_first: inadEvolData?.[0]?.ata || 'VAZIO'
-      });
-      
-      // Sincronizar meses para "Mês Referência": combinar rawData (uniqueMonths) com inadEvolData (aba auxiliar)
-      console.log('📋 fillFilters chamado:', { uniqueMonths: uniqueMonths.length, inadEvolData: inadEvolData.length });
-      
-      // Criar lista de todos os meses: rawData + inadEvolData
-      const allMonthsSet = new Set([...uniqueMonths]);
-      
-      // Converter meses da inadEvolData (formato "mês./ano") para YYYY-MM
-      if (inadEvolData && inadEvolData.length > 0) {
-        console.log('🔄 Sincronizando meses: inadEvolData tem', inadEvolData.length, 'registros');
-        const mesMap = { 'jan': '01','fev': '02','mar': '03','abr': '04','mai': '05','jun': '06','jul': '07','ago': '08','set': '09','out': '10','nov': '11','dez': '12' };
-        
-        inadEvolData.forEach((evolItem, idx) => {
-          const ataStr = evolItem.ata || '';
-          const match = ataStr.match(/(\w{3})\D*(\d{1,4})/i);
-          if (match) {
-            const monthCode = (match[1] || '').toLowerCase();
-            const monthNum = mesMap[monthCode];
-            let year = Number(match[2]);
-            if (!monthNum || !year) {
-              console.log(`  ⚠️ [${idx}] Falhou: ${ataStr} - monthNum=${monthNum}, year=${year}`);
-              return;
-            }
-            if (year < 100) year = 2000 + year;
-            const yyyyMm = `${year}-${monthNum}`;
-            allMonthsSet.add(yyyyMm);
-            console.log(`  ✅ [${idx}] Convertido: ${ataStr} → ${yyyyMm}`);
-          } else {
-            console.log(`  ❌ [${idx}] FALHOU REGEX: ${ataStr}`);
-          }
-        });
-      } else {
-        console.log('⚠️ Sem dados de evolução:', { inadEvolData_is_null: inadEvolData == null, inadEvolData_length: inadEvolData?.length || 0 });
-      }
-      
-      const allAvailableMonths = Array.from(allMonthsSet).sort((a, b) => b.localeCompare(a));
-      console.log('📊 Total de meses após sincronização:', allAvailableMonths.length, '→', allAvailableMonths);
-      
-      monthSel.innerHTML=''; 
-      allAvailableMonths.forEach(m=>{ 
-        const [ano,mes]=m.split('-'); 
-        const opt=document.createElement('option'); 
-        opt.value=m; 
-        opt.textContent=`${getMonthName(Number(mes))} ${ano}`; 
-        monthSel.appendChild(opt); 
-      });
-      if (allAvailableMonths.length>1) monthSel.value = allAvailableMonths[1]; 
-      else if (allAvailableMonths.length>0) monthSel.value = allAvailableMonths[0];
-      
+      monthSel.innerHTML=''; uniqueMonths.forEach(m=>{ const [ano,mes]=m.split('-'); const opt=document.createElement('option'); opt.value=m; opt.textContent=`${getMonthName(Number(mes))} ${ano}`; monthSel.appendChild(opt); });
+  if (uniqueMonths.length>1) monthSel.value = uniqueMonths[1]; else if (uniqueMonths.length>0) monthSel.value = uniqueMonths[0];
       // sincronizar estado e notificar
       window.AppState.uniqueMonths = uniqueMonths;
       window.AppState.selectedMonth = monthSel.value || '';
-      
-      // Popular filtro de mês específico com meses que têm dados detalhados (rawData)
-      const specificMonthSel = document.getElementById('specificMonthFilter');
-      if (specificMonthSel) {
-        const prevSpecificMonth = specificMonthSel.value || '';
-        specificMonthSel.innerHTML = '<option value="">Sem filtro</option>';
-        allAvailableMonths.forEach(m => {
-          const [ano, mes] = m.split('-');
-          const opt = document.createElement('option');
-          opt.value = m;
-          opt.textContent = `${getMonthName(Number(mes))} / ${ano}`;
-          specificMonthSel.appendChild(opt);
-        });
-        if (prevSpecificMonth && allAvailableMonths.includes(prevSpecificMonth)) {
-          specificMonthSel.value = prevSpecificMonth;
-        }
-      }
-      
       const teamSel = document.getElementById('teamFilter');
       if (teamSel) {
         const prevTeam = teamSel.value || '';
@@ -815,21 +827,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
   function processVencimentoData() {
-      const selectedMonth = document.getElementById('monthSelect')?.value; const selectedTeam = document.getElementById('teamFilter')?.value; const selectedVendedor = document.getElementById('vendedorFilter')?.value; const specificMonth = document.getElementById('specificMonthFilter')?.value;
+      const selectedMonth = document.getElementById('monthSelect')?.value; const selectedTeam = document.getElementById('teamFilter')?.value; const selectedVendedor = document.getElementById('vendedorFilter')?.value;
       let filteredData = rawData;
-      if (specificMonth) {
-        filteredData = filteredData.filter(item => {
-          const itemYear = item.ano;
-          const itemMonth = String(item.dataVenda.getMonth() + 1).padStart(2, '0');
-          const itemYearMonth = `${itemYear}-${itemMonth}`;
-          return itemYearMonth === specificMonth;
-        });
-      } else if (selectedMonth) {
-        const [anoRef, mesRef] = selectedMonth.split('-').map(Number);
-        const dataRef = new Date(anoRef, mesRef - 1, 1);
-        const {ini: dataIni, fim: dataFim} = getPeriodo82(dataRef);
-        filteredData = filteredData.filter(item => item.dataVenda >= dataIni && item.dataVenda <= dataFim);
-      }
+      if (selectedMonth) { const [anoRef, mesRef] = selectedMonth.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini: dataIni, fim: dataFim} = getPeriodo82(dataRef); filteredData = filteredData.filter(item => item.dataVenda >= dataIni && item.dataVenda <= dataFim); }
       if (selectedTeam) filteredData = filteredData.filter(item => item.equipe && item.equipe.toLowerCase() === selectedTeam.toLowerCase());
       if (selectedVendedor) filteredData = filteredData.filter(item => item.vendedor && item.vendedor.toLowerCase() === selectedVendedor.toLowerCase());
       const grupos = { '10': { total:0, inadimplente:0, contratos:0 }, '15': { total:0, inadimplente:0, contratos:0 }, '20': { total:0, inadimplente:0, contratos:0 }, '25': { total:0, inadimplente:0, contratos:0 } };
@@ -862,22 +862,11 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const monthRef = document.getElementById('monthSelect')?.value || uniqueMonths[uniqueMonths.length - 1];
       const team = document.getElementById('teamFilter')?.value || '';
       const vendedor = document.getElementById('vendedorFilter')?.value || '';
-      const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
       const statusFiltro = document.getElementById('statusFilter')?.value || '';
       if (!monthRef) return { rows: [], totalVendas: 0 };
       const [anoRef, mesRef] = monthRef.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini:dataIni, fim:dataFim} = getPeriodo82(dataRef);
       const inadSet = new Set(['ATRASADO','EM ATRASO','CANCELADO','INADIMPLENTE','VENCIDO']);
-      let periodData = rawData.filter(r => (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
-      if (specificMonth) {
-        periodData = periodData.filter(r => {
-          const rYear = r.ano;
-          const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0');
-          const rYearMonth = `${rYear}-${rMonth}`;
-          return rYearMonth === specificMonth;
-        });
-      } else {
-        periodData = periodData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim);
-      }
+      const periodData = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
       const totalVendas = periodData.reduce((s,r) => s + (Number(r.valor)||0), 0);
       const rows = periodData.filter(r => {
         const st = String(r.status||'').toUpperCase();
@@ -896,8 +885,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const statusFiltro = document.getElementById('statusFilter')?.value || 'Atrasados + Cancelados';
       const totalInad = rows.reduce((s,r)=> s + (Number(r.valor)||0), 0);
       const percInad = totalVendas > 0 ? ((totalInad / totalVendas) * 100).toFixed(2) : '0.00';
-      const win = window.open('', '_blank');
+      const win = window.open('', '_blank', 'noopener,noreferrer');
       if (!win) { alert('Bloqueio de pop-up. Habilite pop-ups para imprimir/baixar.'); return; }
+      try { win.opener = null; } catch (_) {}
       const style = `
         <style>
           body { font-family: Arial, sans-serif; padding: 16px; color: #111; font-size: 11px; }
@@ -916,40 +906,38 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const header = `
         <h1>Relat\u00f3rio de Inadimpl\u00eancia</h1>
         <div class="meta">
-          <div><b>Per\u00edodo 8-2:</b> ${periodo}</div>
-          <div><b>Equipe:</b> ${team}</div>
-          <div><b>Vendedor:</b> ${vendedor}</div>
-          <div><b>Status:</b> ${statusFiltro}</div>
+          <div><b>Per\u00edodo 8-2:</b> ${escapeHtml(periodo)}</div>
+          <div><b>Equipe:</b> ${escapeHtml(team)}</div>
+          <div><b>Vendedor:</b> ${escapeHtml(vendedor)}</div>
+          <div><b>Status:</b> ${escapeHtml(statusFiltro)}</div>
           <div><b>Gerado em:</b> ${formatDate(new Date())}</div>
         </div>
         <div class="summary">
           <span>Total Inadimpl\u00eancia: ${totalInad.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span> &nbsp;|&nbsp;
           <span>Volume de Vendas: ${totalVendas.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span> &nbsp;|&nbsp;
           <span>% Inadimpl\u00eancia: ${percInad}%</span> &nbsp;|&nbsp;
-          <span>Qtd. Contratos: ${rows.length}</span>
+          <span>Qtd. Registros: ${rows.length}</span>
         </div>`;
       const rowsHtml = rows.map(r => `
         <tr>
-          <td>${(r.ata||'')}</td>
-          <td>${(r.ano||'')}</td>
-          <td>${(r.status||'')}</td>
-          <td>${(r.equipe||'')}</td>
-          <td>${(r.vendedor||'')}</td>
-          <td>${(r.cliente||'')}</td>
-          <td>${(r.contrato||'')}</td>
-          <td>${(r.telefone||'')}</td>
+          <td>${escapeHtml(r.ata||'')}</td>
+          <td>${escapeHtml(r.ano||'')}</td>
+          <td>${escapeHtml(r.status||'')}</td>
+          <td>${escapeHtml(r.equipe||'')}</td>
+          <td>${escapeHtml(r.vendedor||'')}</td>
+          <td>${escapeHtml(r.cliente||'')}</td>
           <td class="right">${(Number(r.valor)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</td>
         </tr>`).join('');
       const html = `
-        <!DOCTYPE html><html><head><meta charset="utf-8"><title>Relat\u00f3rio Inadimpl\u00eancia</title>${style}</head>
+        <!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'unsafe-inline'"> <title>Relat\u00f3rio Inadimpl\u00eancia</title>${style}</head>
         <body>
           ${header}
           <table>
             <thead><tr>
-              <th>Ata</th><th>Ano</th><th>Status</th><th>Equipe</th><th>Vendedor</th><th>Cliente</th><th>Contrato</th><th>Telefone</th><th class="right">Valor</th>
+              <th>Ata</th><th>Ano</th><th>Status</th><th>Equipe</th><th>Vendedor</th><th>Cliente</th><th class="right">Valor</th>
             </tr></thead>
             <tbody>${rowsHtml}</tbody>
-            <tfoot><tr><td colspan="8">Total (${rows.length} contratos)</td><td class="right">${totalInad.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</td></tr></tfoot>
+            <tfoot><tr><td colspan="6">Total (${rows.length} registros)</td><td class="right">${totalInad.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</td></tr></tfoot>
           </table>
           <script>window.addEventListener('load', function(){ setTimeout(function(){ window.print(); window.close(); }, 300); });<\/script>
         </body></html>`;
@@ -957,18 +945,6 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       win.document.write(html);
       win.document.close();
       try { win.focus(); } catch(_) {}
-    }
-
-    // ===== EXPORTAÇÃO VIA API =====
-
-    function exportToPdfApi() {
-      try {
-        // Usar função existente de export PDF
-        exportInadReportPdf();
-      } catch (error) {
-        console.error('Erro ao exportar PDF:', error);
-        alert(`❌ Erro ao exportar PDF: ${error.message}`);
-      }
     }
 
     function createRadialCharts() {
@@ -1037,138 +1013,12 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (challengeEl) challengeEl.textContent = `Reduzir inadimplência do Dia ${critical.label} para abaixo de 20% nos próximos 3 meses`;
     }
 
-    // Função para identificar a filial pelo URL da planilha conectada
-    const getFilialBySheetUrl = window.getFilialBySheetUrl = function() {
-      const currentSheetUrl = localStorage.getItem('sheetUrl') || '';
-      if (!currentSheetUrl) return null;
-      
-      // Extrair ID da planilha da URL armazenada
-      let currentSheetId = null;
-      try {
-        // Formato: https://docs.google.com/spreadsheets/d/e/SHEET_ID/...
-        const match = currentSheetUrl.match(/\/d\/e\/([a-zA-Z0-9\-_]+)/);
-        if (match) currentSheetId = match[1];
-      } catch (e) {
-        console.error('Erro ao extrair ID da planilha:', e);
-      }
-      
-      if (!currentSheetId) {
-        console.warn('⚠️ Não foi possível extrair ID da planilha de:', currentSheetUrl.substring(0, 80));
-        return null;
-      }
-      
-      // Mapeamento de filiais e seus IDs de planilha
-      const Gamificacao_sources = [
-        { nome: 'Santo André', sheetId: '2PACX-1vQ3ToD7PGSzSsse2PknRNR1vBzirmngf3g1nbWz9XFGP1_1viVrs0m95zGfS1PiyG2WSKTIIS1xOVHS' },
-        { nome: 'São Bernardo do Campo', sheetId: '2PACX-1vRdwCZkmISaGAnFqd9MUdQ7OFlakL0iNQ9v-PMYZirR-W-2s4j_28VuntHG6sYIR1qyqij46LWMsLoA' },
-        { nome: 'Guarulhos', sheetId: '2PACX-1vQxYB0l4MSyo7K0xhYmikEXMt5i6DlWMz4B2XYrglNjSpbSyQIOxpB5kkAqIkQd8kXqQCusZ5AfXuC5' },
-        { nome: 'Araçatuba', sheetId: '2PACX-1vS0MTiQ1nXBI8HOg3yRVMYacBHXEI7MlBRhzaX52szMllKHdxVlAxE3A8gA5ZDPnFO-yEGDef86QGE0' },
-        { nome: 'Ipiranga', sheetId: '2PACX-1vT0NjAK33_Q655P-WuhIjV2G_K3q7uzPXc6PFUnnhonWtu7dWVGJrpO_QP_5mfjRgLTbPnAoyvfOZVB' },
-        { nome: 'Mauá', sheetId: '2PACX-1vT1NRT6j0uGUuErHRI1jmYd7Hhtq45XYHjWQtSI384MHMnNHx9j4rKglUR-wkbYN1AJv1eL-7yZgDL2' },
-        { nome: 'Mooca', sheetId: '2PACX-1vQavRu_jHblojklrRajiMR7XGpC0dE2M589LZ00UBaDskg3EZIOoj7n4jLCgE-2ODmZktjP_zSb15ND' },
-        { nome: 'Santos', sheetId: '2PACX-1vR2ECOHv5SVmxCCZ7ffbxLDb6DY7LKBGg9AuPtoSDZDbBcpni5voiLRAZDvsOUyfqcZ3OSuKgx1J33c' },
-        { nome: 'Santo Amaro', sheetId: '2PACX-1vR6-oGCysRnFKZWIVbgHtnSv0qRGDTrQ6cprekhfSJDOAwYu2AdAXmgGJiMAlOvL6K5QS053SeZbqg7' },
-        { nome: 'São José dos Campos', sheetId: '2PACX-1vRR_zNtuNCA492DfdbNihCFowj8U43HwyNpD6E-e_XDl7-49nkc9Hska9BzH0e1pNopxVdPsbGi1Wwb' },
-        { nome: 'Sorocaba', sheetId: '2PACX-1vRDhQ3IediDw10_VuSCTbt1YLqShu0749nIM2Y5HXaZPrAF9eBV09yPXpkJB-2UYNrJn9ZtSUPozoBB' },
-        { nome: 'Suzano', sheetId: '2PACX-1vST4hKhXoz_NGRRUp6aoHr_VGJgQEIVaz3KSVq9KC1riglgNA3HPEOVAQLGFQRLGEFfFHS9xbg0oFoe' },
-        { nome: 'Taubaté', sheetId: '2PACX-1vS7RU4Lh1pWXQefdjavaqG8MjUdMRY6N-5a5bp01z5zycuwxCDVS5Gnt2A6kOrjT2Z9DHJ1NjbZrrqt' },
-        { nome: 'Americana', sheetId: '2PACX-1vQf0kasU6lnx3CT-HjX_OjOU9UOUnJvGlyOJrVC8zA1L-e5ERtaGffz9X7uFSii0HJIpcfxbNnLEvyG' },
-        { nome: 'São José do Rio Preto', sheetId: '2PACX-1vSyCeUtbXYUohS_DRzQnGKC_GdngP0sJISubh7ncWTKMOepSzYCBTFHdqW-FaQs67sMKsR9aOJFj2Lm' },
-        { nome: 'Valinhos', sheetId: '2PACX-1vT2t1URWDYKT_fpwsrr-E5japQLeBVkwjSZ-nxkjUQVQrhdPxzgtdH9EAyU4VN8YTBgIr7hOV3I7gCZ' },
-        { nome: 'Tatuapé', sheetId: '2PACX-1vTX_srLQozewsTh6l2LAf5UZKp3sqRuJPO7ORpuh4xssYxNxq4pHFR-yqG3yxS4mwacM0IfFtxRPaUY' },
-        { nome: 'Piracicaba', sheetId: '2PACX-1vQfet93n1XunJ6BRh3vumZ1jpaD_o-wm4WL6mEnpYK2uvqjT9D2AmJ0n_JgXq5Z99dRLJBBjoMwaXB2' },
-        { nome: 'Bauru', sheetId: '2PACX-1vQUZpK5Ix7w-a9Tp1Y0DTlJqIbgtiJJ9jnBzuuvpeoAjhrWgPzOiGhX-7gEXsI_ygqeQcxeFRgN5wlM' }
-      ];
-      
-      // Procurar filial pelo ID da planilha
-      for (const filial of Gamificacao_sources) {
-        if (currentSheetId === filial.sheetId) {
-          console.log(`🏢 Filial identificada: ${filial.nome}`);
-          return filial.nome;
-        }
-      }
-      
-      console.warn(`⚠️ Filial não encontrada para ID: ${currentSheetId}`);
-      return null;
-    };
-
-    // Função para buscar a meta do admin panel baseado na filial e período
-    const getMetaFromAdmin = window.getMetaFromAdmin = function(selectedTeam, periodo, dataRef) {
-      try {
-        const adminGoals = JSON.parse(localStorage.getItem('dashboard_goals') || '[]');
-        if (!adminGoals || adminGoals.length === 0) return 0.25; // padrão 25%
-        
-        // NOVO: Identificar a filial pelo URL (isolamento por filial)
-        const filialByUrl = getFilialBySheetUrl();
-        
-        // Determinar qual filial procurar
-        let filialToSearch = selectedTeam;
-        
-        // Se houver filial identificada pelo URL, usar APENAS ela (isolamento garantido)
-        if (filialByUrl) {
-          filialToSearch = filialByUrl;
-          console.log(`🔐 Filial isolada pelo URL: ${filialToSearch}`);
-        } else if (!filialToSearch || filialToSearch === 'Todas' || filialToSearch === 'Geral') {
-          // Fallback: usar primeira meta do admin panel
-          if (adminGoals.length > 0) {
-            filialToSearch = adminGoals[0]?.scope;
-          }
-          
-          if (!filialToSearch) return 0.25;
-        }
-        
-        // Procurar meta correspondente APENAS para a filial identificada
-        for (const goal of adminGoals) {
-          // Procurar meta individual por filial - aceita múltiplos formatos de tipo
-          const isIndividualGoal = goal.type === 'individual' || 
-                                   goal.type === 'Individual' || 
-                                   goal.type === 'Individual (Por Filial)';
-          
-          if (isIndividualGoal && goal.scope) {
-            const goalFilial = goal.scope.toLowerCase().trim();
-            const searchFilial = filialToSearch.toLowerCase().trim();
-            
-            // Comparação flexível
-            if (goalFilial === searchFilial || searchFilial.includes(goalFilial) || goalFilial.includes(searchFilial)) {
-              // Verificar período (se dataRef é fornecido)
-              if (goal.period) {
-                // Se o período é 'período 8-2', validar com base no mês de referência
-                if (goal.period.toLowerCase().includes('período 8-2') || goal.period.toLowerCase().includes('período-8-2')) {
-                  // Para período 8-2, usar o período calculado em vez de datas específicas
-                  console.log(`✅ Meta encontrada para ${goal.scope}: ${goal.targetInadempl}% (Período 8-2)`);
-                  return (goal.targetInadempl || 25) / 100;
-                } else if (goal.startDate && goal.endDate && dataRef) {
-                  // Para outros períodos, verificar datas
-                  const metaIni = new Date(goal.startDate);
-                  const metaFim = new Date(goal.endDate);
-                  if (dataRef >= metaIni && dataRef <= metaFim) {
-                    console.log(`✅ Meta encontrada para ${goal.scope}: ${goal.targetInadempl}%`);
-                    return (goal.targetInadempl || 25) / 100;
-                  }
-                }
-              } else {
-                // Se não há período especificado, aceitar a meta
-                console.log(`✅ Meta encontrada para ${goal.scope}: ${goal.targetInadempl}%`);
-                return (goal.targetInadempl || 25) / 100;
-              }
-            }
-          }
-        }
-        
-        console.log(`⚠️ Nenhuma meta encontrada para ${filialToSearch}, usando padrão 25%`);
-      } catch (e) {
-        console.warn('Erro ao buscar meta do admin:', e);
-      }
-      return 0.25; // padrão 25%
-    }
-
-    const updateDashboard = window.updateDashboard = function() {
+    function updateDashboard() {
   // Se a view do Dashboard não está montada, não atualiza DOM
   if (!document.getElementById('dashboard-container')) return;
       const monthRef = document.getElementById('monthSelect').value || uniqueMonths[uniqueMonths.length - 1];
       const team = document.getElementById('teamFilter').value;
       const vendedor = document.getElementById('vendedorFilter')?.value || '';
-      const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
       const [anoRef, mesRef] = monthRef.split('-').map(Number); const dataRef = new Date(anoRef, mesRef - 1, 1); const {ini:dataIni, fim:dataFim} = getPeriodo82(dataRef);
       const proximoMes = new Date(dataRef); proximoMes.setMonth(dataRef.getMonth()+1); const {ini:dataIniProj, fim:dataFimProj} = getPeriodo82(proximoMes);
       const mesesNomes = ['', 'Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -1179,17 +1029,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
   window.AppState.selectedMonth = monthRef;
   window.AppState.periodo82Text = periodoTexto;
   document.dispatchEvent(new CustomEvent('app:monthsUpdated', { detail: { uniqueMonths: window.AppState.uniqueMonths, selectedMonth: window.AppState.selectedMonth, periodo82Text: window.AppState.periodo82Text, sheetUrl: window.AppState.sheetUrl } }));
-      let dataFiltrada = rawData.filter(r => (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
-      if (specificMonth) {
-        dataFiltrada = dataFiltrada.filter(r => {
-          const rYear = r.ano;
-          const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0');
-          const rYearMonth = `${rYear}-${rMonth}`;
-          return rYearMonth === specificMonth;
-        });
-      } else {
-        dataFiltrada = dataFiltrada.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim);
-      }
+      let dataFiltrada = rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
       const totalVendas = dataFiltrada.reduce((acc,r)=>acc+r.valor,0);
       processVencimentoData();
       const totalAtrasado = dataFiltrada.filter(r=>r.status==='ATRASADO').reduce((acc,r)=>acc+r.valor,0);
@@ -1200,14 +1040,12 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const totalAtrasadoProj = dataProj.filter(r=>r.status==='ATRASADO').reduce((acc,r)=>acc+r.valor,0);
       const totalCanceladoProj = dataProj.filter(r=>r.status==='CANCELADO').reduce((acc,r)=>acc+r.valor,0);
       const inadimplenciaProj = totalVendasProj ? (totalAtrasadoProj + totalCanceladoProj) / totalVendasProj : 0;
-      const riscoPotencial = totalVendas * inadimplencia; const metaInadimplencia = getMetaFromAdmin(team || 'Geral', 'periodo-8-2', dataRef); window.currentMetaPercent = metaInadimplencia * 100; const metaAtingida = inadimplencia <= metaInadimplencia; const diferenciaMeta = Math.abs((inadimplencia - metaInadimplencia) * 100);
+      const riscoPotencial = totalVendas * inadimplencia; const metaInadimplencia = 0.25; const metaAtingida = inadimplencia <= metaInadimplencia; const diferenciaMeta = Math.abs((inadimplencia - metaInadimplencia) * 100);
       const prevRef = new Date(dataRef.getFullYear(), dataRef.getMonth()-1, 1); const {ini:prevIni, fim:prevFim} = getPeriodo82(prevRef);
       const prevData = rawData.filter(r => r.dataVenda >= prevIni && r.dataVenda <= prevFim && (!team || (r.equipe && r.equipe.toLowerCase()===team.toLowerCase())) && (!vendedor || (r.vendedor && r.vendedor.toLowerCase()===vendedor.toLowerCase())));
       const prevVendas = prevData.reduce((acc,r)=>acc+r.valor,0);
   const currInadEl = document.getElementById('currentInadimplencia'); if (currInadEl) currInadEl.textContent = formatPercent(inadimplencia);
       const metaStatusEl = document.getElementById('metaStatus'); const metaDiferencaEl = document.getElementById('metaDiferenca');
-      const metaDisplayEl = document.getElementById('metaDisplay'); if (metaDisplayEl) metaDisplayEl.textContent = (metaInadimplencia * 100).toFixed(1) + '%';
-      const metaLabelEl = document.getElementById('metaLabel'); if (metaLabelEl) metaLabelEl.textContent = `Meta ${(metaInadimplencia * 100).toFixed(1)}%`;
       if (metaStatusEl) metaStatusEl.textContent = metaAtingida ? 'ATINGIDA ✅' : 'NÃO ATINGIDA ❌';
       if (metaDiferencaEl) metaDiferencaEl.textContent = metaAtingida ? `${diferenciaMeta.toFixed(1)}pp abaixo da meta` : `${diferenciaMeta.toFixed(1)}pp acima da meta`;
       setTimeout(()=>initMetricSlide(), 100);
@@ -1233,20 +1071,8 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (!podiumEl || !listEl) return;
 
       // Agrupar por equipe no período
-      const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
-      let teamData = rawData.filter(r => r.equipe);
-      if (specificMonth) {
-        teamData = teamData.filter(r => {
-          const rYear = r.ano;
-          const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0');
-          const rYearMonth = `${rYear}-${rMonth}`;
-          return rYearMonth === specificMonth;
-        });
-      } else {
-        teamData = teamData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim);
-      }
       const teamMap = new Map();
-      teamData.forEach(r => {
+      rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.equipe).forEach(r => {
         const key = r.equipe;
         const agg = teamMap.get(key) || { nome: key, producao: 0, inadValor: 0 };
         agg.producao += r.valor;
@@ -1258,23 +1084,67 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
       if (!ranking.length) { podiumEl.innerHTML = ''; listEl.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Sem dados de equipe no período</div>'; return; }
 
-      // MINIMALISTA: Tabela simples sem cards grandes
-      podiumEl.innerHTML = '';
-      listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:0;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden;">' + 
-        ranking.map((t, i) => {
-          const pos = i + 1;
-          const inadPerc = (t.inad * 100).toFixed(1);
-          const medalIcon = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '';
-          const inadColor = t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5';
-          const rowBg = i % 2 === 0 ? 'rgba(255,255,255,.02)' : 'rgba(0,0,0,.1)';
-          return `
-            <div style="display:grid;grid-template-columns:40px 1fr 100px 120px;gap:12px;align-items:center;padding:12px 16px;background:${rowBg};border-bottom:${i < ranking.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none'};transition:background .2s;">
-              <div style="text-align:center;font-weight:800;color:#94a3b8;font-size:0.9rem;">${medalIcon || pos}º</div>
-              <div style="font-weight:600;color:#e2e8f0;font-size:0.95rem;">${t.nome}</div>
-              <div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${inadColor};font-size:0.95rem;text-align:right;">${inadPerc}%</div>
-              <div style="font-size:0.85rem;color:#94a3b8;text-align:right;">${formatCurrency(t.producao)}</div>
-            </div>`;
-        }).join('') + '</div>';
+      const medals = ['🥇','🥈','🥉'];
+      const podiumColors = [
+        { bg: 'linear-gradient(135deg,#fbbf24,#f59e0b)', shadow: '0 0 25px rgba(251,191,36,.4)', border: 'rgba(251,191,36,.5)', height: '140px' },
+        { bg: 'linear-gradient(135deg,#cbd5e1,#94a3b8)', shadow: '0 0 20px rgba(148,163,184,.3)', border: 'rgba(148,163,184,.4)', height: '115px' },
+        { bg: 'linear-gradient(135deg,#d97706,#b45309)', shadow: '0 0 20px rgba(217,119,6,.3)', border: 'rgba(217,119,6,.4)', height: '95px' }
+      ];
+
+      // Podium (top 3)
+      const top3 = ranking.slice(0, 3);
+      const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : (top3.length === 2 ? [top3[1], top3[0]] : [top3[0]]);
+      const podiumIdxMap = top3.length >= 3 ? [1, 0, 2] : (top3.length === 2 ? [1, 0] : [0]);
+
+      podiumEl.innerHTML = podiumOrder.map((t, i) => {
+        const realIdx = podiumIdxMap[i];
+        const pc = podiumColors[realIdx];
+        const inadPerc = (t.inad * 100).toFixed(1);
+        const inadColor = t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5';
+        const isFirst = realIdx === 0;
+        const firstGlow = isFirst ? 'animation:championPulse 2s ease-in-out infinite;' : '';
+        const firstCardStyle = isFirst
+          ? `background:linear-gradient(135deg,rgba(251,191,36,.12),rgba(245,158,11,.05));border:2px solid rgba(251,191,36,.6);box-shadow:${pc.shadow}, 0 0 40px rgba(251,191,36,.2);animation:championCardGlow 2.5s ease-in-out infinite;`
+          : `background:var(--glass-bg);border:1px solid ${pc.border};box-shadow:${pc.shadow};`;
+        return `
+          <div style="display:flex;flex-direction:column;align-items:center;width:${isFirst ? '210px' : '170px'};">
+            <div style="font-size:${isFirst ? '3.2rem' : '2.2rem'};margin-bottom:4px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.4));${firstGlow}">${medals[realIdx]}</div>
+            <div style="font-size:${isFirst ? '0.85rem' : '0.7rem'};color:${isFirst ? '#fbbf24' : '#94a3b8'};font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">${realIdx+1}º Lugar</div>
+            <div style="${firstCardStyle}border-radius:${isFirst ? '20px' : '14px'};padding:${isFirst ? '20px 16px' : '14px 10px'};width:100%;text-align:center;min-height:${pc.height};display:flex;flex-direction:column;justify-content:center;transition:all .3s;cursor:default;"
+                 onmouseenter="this.style.transform='translateY(-8px) scale(1.04)'" onmouseleave="this.style.transform='none'">
+              ${isFirst ? '<div style="font-size:1.5rem;margin-bottom:6px;">👑</div>' : ''}
+              <div style="font-weight:800;font-size:${isFirst ? '1.15rem' : '0.9rem'};color:#e2e8f0;margin-bottom:8px;line-height:1.2;">${t.nome}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:${isFirst ? '2rem' : '1.4rem'};font-weight:900;color:${inadColor};text-shadow:0 0 ${isFirst ? '25px' : '12px'} ${inadColor}44;margin-bottom:4px;">${inadPerc}%</div>
+              <div style="font-size:0.7rem;color:#94a3b8;">Inadimplência</div>
+              <div style="margin-top:8px;font-size:0.75rem;color:#cbd5e1;">Prod: ${formatCurrency(t.producao)}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      // Lista restante (4º em diante)
+      const rest = ranking.slice(3);
+      if (!rest.length) { listEl.innerHTML = ''; return; }
+      listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">' + rest.map((t, i) => {
+        const pos = i + 4;
+        const inadPerc = (t.inad * 100).toFixed(1);
+        const barWidth = Math.min(100, Math.max(3, t.inad * 100 * 2));
+        const barColor = t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5';
+        return `
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 16px;transition:all .3s;"
+               onmouseenter="this.style.background='rgba(255,255,255,.06)';this.style.transform='translateX(4px)'" onmouseleave="this.style.background='rgba(255,255,255,.03)';this.style.transform='none'">
+            <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-weight:800;color:#94a3b8;font-size:0.9rem;flex-shrink:0;">${pos}º</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;color:#e2e8f0;font-size:0.9rem;margin-bottom:4px;">${t.nome}</div>
+              <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;">
+                <div style="height:100%;width:${barWidth}%;background:${barColor};border-radius:6px;transition:width .8s ease;"></div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:${barColor};font-size:1rem;">${inadPerc}%</div>
+              <div style="font-size:0.7rem;color:#94a3b8;">${formatCurrency(t.producao)}</div>
+            </div>
+          </div>`;
+      }).join('') + '</div>';
     }
 
     function renderVendorRanking(dataIni, dataFim) {
@@ -1284,25 +1154,13 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
 
       const team = document.getElementById('teamFilter')?.value || '';
       const vendedorFilter = document.getElementById('vendedorFilter')?.value || '';
-      const specificMonth = document.getElementById('specificMonthFilter')?.value || '';
 
       // Agrupar por vendedor no período
-      let vendorData = rawData.filter(r => r.vendedor
+      const vendorMap = new Map();
+      rawData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim && r.vendedor
         && (!team || (r.equipe && r.equipe.toLowerCase() === team.toLowerCase()))
         && (!vendedorFilter || (r.vendedor.toLowerCase() === vendedorFilter.toLowerCase()))
-      );
-      if (specificMonth) {
-        vendorData = vendorData.filter(r => {
-          const rYear = r.ano;
-          const rMonth = String(r.dataVenda.getMonth() + 1).padStart(2, '0');
-          const rYearMonth = `${rYear}-${rMonth}`;
-          return rYearMonth === specificMonth;
-        });
-      } else {
-        vendorData = vendorData.filter(r => r.dataVenda >= dataIni && r.dataVenda <= dataFim);
-      }
-      const vendorMap = new Map();
-      vendorData.forEach(r => {
+      ).forEach(r => {
         const key = r.vendedor;
         const agg = vendorMap.get(key) || { nome: key, equipe: r.equipe || '', producao: 0, inadValor: 0 };
         agg.producao += r.valor;
@@ -1312,37 +1170,91 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       });
 
       const allVendors = Array.from(vendorMap.values()).map(t => ({ ...t, inad: t.producao > 0 ? t.inadValor / t.producao : 0 }));
+
+      // Separar vendedores com vendas e sem vendas (produção zero fica no final)
+
+      // Critério para pódio: vendas acima de 2 milhões
+      const podiumEligible = allVendors.filter(v => v.producao > 2000000).sort((a, b) => a.inad - b.inad);
       const withSales = allVendors.filter(v => v.producao > 0).sort((a, b) => a.inad - b.inad);
       const noSales = allVendors.filter(v => v.producao === 0).sort((a, b) => a.nome.localeCompare(b.nome));
       const ranking = [...withSales, ...noSales];
 
       if (!ranking.length) { podiumEl.innerHTML = ''; listEl.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Sem dados de vendedores no período</div>'; return; }
 
-      // MINIMALISTA: Grid 2 colunas compacto
-      podiumEl.innerHTML = '';
-      listEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' + 
-        ranking.map((t, i) => {
-          const pos = i + 1;
-          const isZero = t.producao === 0;
-          const medalIcon = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : '';
-          const inadPerc = isZero ? '-' : (t.inad * 100).toFixed(1);
-          const inadColor = isZero ? '#475569' : (t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5');
-          const bgColor = isZero ? 'rgba(71,85,105,.08)' : 'rgba(255,255,255,.04)';
-          const borderColor = isZero ? 'rgba(71,85,105,.2)' : 'rgba(255,255,255,.1)';
+      const medals = ['🥇','🥈','🥉'];
+      const podiumColors = [
+        { bg: 'linear-gradient(135deg,#06ffa5,#00d4ff)', shadow: '0 0 25px rgba(6,255,165,.35)', border: 'rgba(6,255,165,.5)', height: '140px' },
+        { bg: 'linear-gradient(135deg,#cbd5e1,#94a3b8)', shadow: '0 0 20px rgba(148,163,184,.3)', border: 'rgba(148,163,184,.4)', height: '115px' },
+        { bg: 'linear-gradient(135deg,#a855f7,#7c3aed)', shadow: '0 0 20px rgba(168,85,247,.3)', border: 'rgba(168,85,247,.4)', height: '95px' }
+      ];
+
+      // Pódio (top 3 com vendas acima de 2 milhões)
+      const top3 = podiumEligible.slice(0, 3);
+      const podiumOrder = top3.length >= 3 ? [top3[1], top3[0], top3[2]] : (top3.length === 2 ? [top3[1], top3[0]] : top3.length === 1 ? [top3[0]] : []);
+      const podiumIdxMap = top3.length >= 3 ? [1, 0, 2] : (top3.length === 2 ? [1, 0] : [0]);
+      if (!top3.length) {
+        podiumEl.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px;">Nenhum vendedor com vendas acima de 2 milhões no período</div>';
+      } else {
+        podiumEl.innerHTML = podiumOrder.map((t, i) => {
+          const realIdx = podiumIdxMap[i];
+          const pc = podiumColors[realIdx];
+          const inadPerc = (t.inad * 100).toFixed(1);
+          const inadColor = t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5';
+          const isFirst = realIdx === 0;
+          const firstGlow = isFirst ? 'animation:championPulse 2s ease-in-out infinite;' : '';
+          const firstCardStyle = isFirst
+            ? `background:linear-gradient(135deg,rgba(6,255,165,.1),rgba(0,212,255,.05));border:2px solid rgba(6,255,165,.5);box-shadow:${pc.shadow}, 0 0 40px rgba(6,255,165,.15);animation:championCardGlow 2.5s ease-in-out infinite;`
+            : `background:var(--glass-bg);border:1px solid ${pc.border};box-shadow:${pc.shadow};`;
           return `
-            <div style="display:flex;flex-direction:column;gap:6px;border:1px solid ${borderColor};border-radius:8px;padding:8px 10px;background:${bgColor};transition:all .2s;position:relative;${isZero ? 'opacity:.7;' : ''}"
-                 onmouseenter="this.style.background='${isZero ? 'rgba(71,85,105,.12)' : 'rgba(255,255,255,.08)'}'" onmouseleave="this.style.background='${bgColor}'">
-              <div style="position:absolute;top:4px;right:6px;font-weight:800;font-size:0.7rem;background:rgba(102,126,234,.2);color:#667eea;padding:2px 6px;border-radius:4px;letter-spacing:0.5px;">${pos}º</div>
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;padding-right:30px;">
-                <div style="font-weight:700;color:#e2e8f0;font-size:0.9rem;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${medalIcon} ${t.nome}</div>
-                <div style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${inadColor};font-size:0.85rem;flex-shrink:0;">${inadPerc}${isZero ? '' : '%'}</div>
-              </div>
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:0.75rem;">
-                <div style="color:#64748b;">${t.equipe}</div>
-                <div style="color:#94a3b8;text-align:right;">${formatCurrency(t.producao)}</div>
+            <div style="display:flex;flex-direction:column;align-items:center;width:${isFirst ? '210px' : '170px'};">
+              <div style="font-size:${isFirst ? '3.2rem' : '2.2rem'};margin-bottom:4px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.4));${firstGlow}">${medals[realIdx]}</div>
+              <div style="font-size:${isFirst ? '0.85rem' : '0.7rem'};color:${isFirst ? '#06ffa5' : '#94a3b8'};font-weight:800;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">${realIdx + 1}º Lugar</div>
+              <div style="${firstCardStyle}border-radius:${isFirst ? '20px' : '14px'};padding:${isFirst ? '20px 16px' : '14px 10px'};width:100%;text-align:center;min-height:${pc.height};display:flex;flex-direction:column;justify-content:center;transition:all .3s;cursor:default;"
+                   onmouseenter="this.style.transform='translateY(-8px) scale(1.04)'" onmouseleave="this.style.transform='none'">
+                ${isFirst ? '<div style=\"font-size:1.5rem;margin-bottom:6px;\">⭐</div>' : ''}
+                <div style="font-weight:800;font-size:${isFirst ? '1.15rem' : '0.9rem'};color:#e2e8f0;margin-bottom:4px;line-height:1.2;">${t.nome}</div>
+                <div style="font-size:0.65rem;color:#64748b;margin-bottom:8px;">${t.equipe}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:${isFirst ? '2rem' : '1.4rem'};font-weight:900;color:${inadColor};text-shadow:0 0 ${isFirst ? '25px' : '12px'} ${inadColor}44;margin-bottom:4px;">${inadPerc}%</div>
+                <div style="font-size:0.7rem;color:#94a3b8;">Inadimplência</div>
+                <div style="margin-top:8px;font-size:0.75rem;color:#cbd5e1;">Prod: ${formatCurrency(t.producao)}</div>
               </div>
             </div>`;
-        }).join('') + '</div>';
+        }).join('');
+      }
+
+      // Lista restante (4º em diante com vendas + vendedores zerados no final)
+      const restWithSales = withSales.slice(3);
+      const allRest = [...restWithSales, ...noSales];
+      if (!allRest.length) { listEl.innerHTML = ''; return; }
+
+      let pos = 4;
+      listEl.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;">' + allRest.map((t) => {
+        const isZero = t.producao === 0;
+        const inadPerc = isZero ? '-' : (t.inad * 100).toFixed(1) + '%';
+        const barWidth = isZero ? 0 : Math.min(100, Math.max(3, t.inad * 100 * 2));
+        const barColor = isZero ? '#475569' : (t.inad > 0.30 ? '#ef4444' : t.inad > 0.25 ? '#f59e0b' : '#06ffa5');
+        const currentPos = pos++;
+        const zeroTag = isZero ? '<span style="font-size:0.6rem;background:rgba(71,85,105,.3);color:#64748b;padding:2px 6px;border-radius:4px;margin-left:8px;">SEM VENDAS</span>' : '';
+        return `
+          <div style="display:flex;align-items:center;gap:12px;background:${isZero ? 'rgba(71,85,105,.06)' : 'rgba(255,255,255,.03)'};border:1px solid ${isZero ? 'rgba(71,85,105,.15)' : 'rgba(255,255,255,.06)'};border-radius:12px;padding:12px 16px;transition:all .3s;${isZero ? 'opacity:.6;' : ''}"
+               onmouseenter="this.style.background='${isZero ? 'rgba(71,85,105,.1)' : 'rgba(255,255,255,.06)'}';this.style.transform='translateX(4px)'" onmouseleave="this.style.background='${isZero ? 'rgba(71,85,105,.06)' : 'rgba(255,255,255,.03)'}';this.style.transform='none'">
+            <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-weight:800;color:${isZero ? '#475569' : '#94a3b8'};font-size:0.9rem;flex-shrink:0;">${currentPos}º</div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+                <span style="font-weight:700;color:${isZero ? '#64748b' : '#e2e8f0'};font-size:0.9rem;">${t.nome}</span>
+                <span style="font-size:0.65rem;color:#64748b;">· ${t.equipe}</span>
+                ${zeroTag}
+              </div>
+              <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden;">
+                <div style="height:100%;width:${barWidth}%;background:${barColor};border-radius:6px;transition:width .8s ease;"></div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-family:'JetBrains Mono',monospace;font-weight:800;color:${barColor};font-size:1rem;">${inadPerc}</div>
+              <div style="font-size:0.7rem;color:#94a3b8;">${formatCurrency(t.producao)}</div>
+            </div>
+          </div>`;
+      }).join('') + '</div>';
     }
 
     function initMetricSlide() {
@@ -1352,38 +1264,97 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     async function loadSheetData() {
-      const saveEl = document.getElementById('saveSheetUrl'); const inputEl = document.getElementById('sheetUrlInput'); if (inputEl) inputEl.value = localStorage.getItem('sheetUrl') || '';
-      console.log('🔵 loadSheetData iniciado. SHEET_CSV_URL:', !!SHEET_CSV_URL);
-      if (!SHEET_CSV_URL) {
-        console.log('🔵 Usando dados de TESTE (fallback)');
-        // Dados de teste mínimos
-        const newData = [
-          { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, contrato:'C1', telefone:'', dataVenda:new Date(2025,1,1) },
-          { ata:'mar./25', ano:'2025', status:'ATRASADO', vencimento:'20', equipe:'EQUIPE A', vendedor:'B', cliente:'Y', valor:45000, contrato:'C2', telefone:'', dataVenda:new Date(2025,2,1) },
-          { ata:'abr./25', ano:'2025', status:'CANCELADO', vencimento:'25', equipe:'EQUIPE B', vendedor:'C', cliente:'Z', valor:60000, contrato:'C3', telefone:'', dataVenda:new Date(2025,3,1) }
-        ];
-        rawData.length = 0; rawData.push(...newData);
-        const newMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
-        uniqueMonths.length = 0; uniqueMonths.push(...newMonths);
-        const newTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        uniqueTeams.length = 0; uniqueTeams.push(...newTeams);
-        // loadAuxSheet agora chama fillFilters internamente
-        await loadAuxSheet(); 
-        document.getElementById('loadingMsg').style.display='none'; 
-        processVencimentoData(); 
-        setTimeout(()=>updateDashboard(),100); 
+      const inputEl = document.getElementById('sheetUrlInput');
+      if (inputEl) inputEl.value = sheetUrl || '';
+      const secureStatusEl = document.getElementById('secureStatus');
+      if (secureStatusEl) {
+        secureStatusEl.textContent = secureSession.authenticated
+          ? `Autenticado (${secureSession.filialId || 'filial'})`
+          : 'Não autenticado';
+      }
+      const consentOn = hasLgpdConsent() || !!document.getElementById('lgpdConsent')?.checked;
+      if (!secureSession.authenticated && SHEET_CSV_URL && !consentOn) {
+        const loadingEl = document.getElementById('loadingMsg');
+        if (loadingEl) {
+          loadingEl.style.display = 'block';
+          loadingEl.textContent = 'Para segurança LGPD, marque o consentimento antes de carregar dados da planilha.';
+        }
         return;
+      }
+
+      if (secureSession.authenticated) {
+        try {
+          document.getElementById('loadingMsg').style.display = 'block';
+          const secureResp = await fetch('/api/data?kind=main', { method: 'GET', credentials: 'include' });
+          if (!secureResp.ok) throw new Error('Erro ao buscar planilha no modo seguro');
+          const payload = await secureResp.json();
+          const csv = payload.csv || '';
+          const delim = detectDelimiter(csv);
+          const rows = csv.trim().split(/\r?\n/).map(l=> l.split(delim));
+          const headers = rows[0].map(h => (h||'').toString().trim().toLowerCase());
+          const norm = (val) => (val||'').toString().trim();
+          const getIdx = (alts) => headers.findIndex(h => alts.includes(h));
+          const iAta = getIdx(['ata','mês','mes']);
+          const iAno = getIdx(['ano','ano_ref','ano referência','ano referencia']);
+          const iStatus = getIdx(['status','situação','situacao']);
+          const iVenc = getIdx(['vencimento','dia vencimento','dia_vencimento']);
+          const iEquipe = getIdx(['equipe','time','squad']);
+          const iVend = getIdx(['vendedor','consultor','colaborador']);
+          const iSupervisor = getIdx(['supervisor','gestor','coordenador']);
+          const iCliente = getIdx(['cliente','nome_cliente']);
+          const iValor = getIdx(['valor','valor_contrato','valor venda','valor_venda','producao','produção']);
+          const iData = getIdx(['data','data_venda','data venda','dt_venda','dt venda']);
+          rawData = rows.slice(1).map(cols => {
+            const ata = iAta>=0 ? norm(cols[iAta]) : '';
+            const ano = iAno>=0 ? norm(cols[iAno]) : '';
+            const status = (iStatus>=0 ? norm(cols[iStatus]) : '').toUpperCase();
+            const vencimento = iVenc>=0 ? norm(cols[iVenc]) : '';
+            const equipe = iEquipe>=0 ? norm(cols[iEquipe]) : '';
+            const vendedor = iVend>=0 ? norm(cols[iVend]) : '';
+            const supervisor = iSupervisor>=0 ? norm(cols[iSupervisor]) : '';
+            const cliente = iCliente>=0 ? norm(cols[iCliente]) : '';
+            const rawValor = iValor>=0 ? norm(cols[iValor]) : '0';
+            const valor = Number(rawValor.replace(/\./g,'').replace(',','.').replace(/[^\d.-]/g,'')) || 0;
+            let dataVenda;
+            const dataStr = iData>=0 ? norm(cols[iData]) : '';
+            if (dataStr) {
+              const ddm = dataStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if (ddm) dataVenda = new Date(Number(ddm[3].length===2?('20'+ddm[3]):ddm[3]), Number(ddm[2])-1, Number(ddm[1]));
+              else { const iso = Date.parse(dataStr); if (!isNaN(iso)) dataVenda = new Date(iso); }
+            }
+            if (!dataVenda) dataVenda = parseDateFromAta(ata, ano);
+            if (!(dataVenda instanceof Date) || isNaN(dataVenda)) dataVenda = new Date();
+            return { ata, ano: ano || String(dataVenda.getFullYear()), status, vencimento, equipe, vendedor, supervisor, cliente, valor, dataVenda };
+          });
+          uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+          uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+          uniqueVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+          uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+          fillFilters();
+          await loadAuxSheet();
+          document.getElementById('loadingMsg').style.display='none';
+          processVencimentoData();
+          setTimeout(()=>updateDashboard(),100);
+          return;
+        } catch (e) {
+          document.getElementById('loadingMsg').textContent = 'Erro ao carregar dados seguros: ' + e.message;
+          return;
+        }
+      }
+
+      if (!SHEET_CSV_URL) {
+        // Dados de teste mínimos
+        rawData = [
+          { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, dataVenda:new Date(2025,1,1) },
+          { ata:'mar./25', ano:'2025', status:'ATRASADO', vencimento:'20', equipe:'EQUIPE A', vendedor:'B', cliente:'Y', valor:45000, dataVenda:new Date(2025,2,1) },
+          { ata:'abr./25', ano:'2025', status:'CANCELADO', vencimento:'25', equipe:'EQUIPE B', vendedor:'C', cliente:'Z', valor:60000, dataVenda:new Date(2025,3,1) }
+        ];
+        uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        fillFilters(); await loadAuxSheet(); document.getElementById('loadingMsg').style.display='none'; processVencimentoData(); setTimeout(()=>updateDashboard(),100); return;
       }
       try {
         document.getElementById('loadingMsg').style.display = 'block';
-        // Usar proxy do backend para evitar CORS na Vercel
-        const baseUrl = window.location.origin; // Pega a origem atual (localhost ou Vercel)
-        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(SHEET_CSV_URL);
-        console.log('📊 Carregando planilha via proxy:', proxyUrl);
-        const resp = await fetch(proxyUrl); 
-        if (!resp.ok) throw new Error('Erro ao buscar planilha: ' + resp.statusText); 
-        console.log('✅ Planilha carregada com sucesso via proxy');
-        const csv = await resp.text();
+        const resp = await fetch(SHEET_CSV_URL + '&cache=' + Date.now()); if (!resp.ok) throw new Error('Erro ao buscar planilha'); const csv = await resp.text();
         const delim = detectDelimiter(csv);
         const rows = csv.trim().split(/\r?\n/).map(l=> l.split(delim));
         const headers = rows[0].map(h => (h||'').toString().trim().toLowerCase());
@@ -1398,9 +1369,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
         const iSupervisor = getIdx(['supervisor','gestor','coordenador']);
         const iCliente = getIdx(['cliente','nome_cliente']);
         const iValor = getIdx(['valor','valor_contrato','valor venda','valor_venda','producao','produção']);
-        const iContrato = getIdx(['contrato','n_contrato','num_contrato','numero_contrato']);
         const iData = getIdx(['data','data_venda','data venda','dt_venda','dt venda']);
-        const iTelefone = getIdx(['telefone','tel','celular','fone','phone','contato']);
         rawData = rows.slice(1).map(cols => {
           const ata = iAta>=0 ? norm(cols[iAta]) : '';
           const ano = iAno>=0 ? norm(cols[iAno]) : '';
@@ -1412,8 +1381,6 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           const cliente = iCliente>=0 ? norm(cols[iCliente]) : '';
           const rawValor = iValor>=0 ? norm(cols[iValor]) : '0';
           const valor = Number(rawValor.replace(/\./g,'').replace(',','.').replace(/[^\d.-]/g,'')) || 0;
-          const contrato = iContrato>=0 ? norm(cols[iContrato]) : '';
-          const telefone = iTelefone>=0 ? norm(cols[iTelefone]) : '';
           let dataVenda;
           const dataStr = iData>=0 ? norm(cols[iData]) : '';
           if (dataStr) {
@@ -1422,60 +1389,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
           }
           if (!dataVenda) dataVenda = parseDateFromAta(ata, ano);
           if (!(dataVenda instanceof Date) || isNaN(dataVenda)) dataVenda = new Date();
-          // Corrige ano para sempre ser 4-dígitos (YYYY)
-          let anoNorm = String(dataVenda.getFullYear());
-          if (ano) {
-            const anoNum = Number(ano);
-            if (anoNum >= 0 && anoNum <= 99) anoNorm = String(2000 + anoNum);
-            else if (anoNum >= 100) anoNorm = String(anoNum);
-          }
-          return { ata, ano: anoNorm, status, vencimento, equipe, vendedor, supervisor, cliente, valor, contrato, telefone, dataVenda };
+          return { ata, ano: ano || String(dataVenda.getFullYear()), status, vencimento, equipe, vendedor, supervisor, cliente, valor, dataVenda };
         });
-        const newMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
-        uniqueMonths.length = 0; uniqueMonths.push(...newMonths);
-        const newTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        uniqueTeams.length = 0; uniqueTeams.push(...newTeams);
-        const newVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-        uniqueVendedores.length = 0; uniqueVendedores.push(...newVendedores);
-        const newSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
-        uniqueSupervisores.length = 0; uniqueSupervisores.push(...newSupervisores);
-        // loadAuxSheet agora chama fillFilters internamente
-        await loadAuxSheet();
-        document.getElementById('loadingMsg').style.display='none'; 
-        processVencimentoData(); 
-        setTimeout(()=>updateDashboard(),100);
-      } catch (e) { 
-        console.error('❌ Erro ao carregar dados:', e);
-        // Usar dados de teste quando há erro
-        const newData = [
-          { ata:'fev./25', ano:'2025', status:'EM DIA', vencimento:'10', equipe:'EQUIPE A', vendedor:'A', cliente:'X', valor:120000, contrato:'C1', telefone:'', dataVenda:new Date(2025,1,1) },
-          { ata:'mar./25', ano:'2025', status:'ATRASADO', vencimento:'20', equipe:'EQUIPE A', vendedor:'B', cliente:'Y', valor:45000, contrato:'C2', telefone:'', dataVenda:new Date(2025,2,1) },
-          { ata:'abr./25', ano:'2025', status:'CANCELADO', vencimento:'25', equipe:'EQUIPE B', vendedor:'C', cliente:'Z', valor:60000, contrato:'C3', telefone:'', dataVenda:new Date(2025,3,1) }
-        ];
-        rawData.length = 0; rawData.push(...newData);
-        const newMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
-        uniqueMonths.length = 0; uniqueMonths.push(...newMonths);
-        const newTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
-        uniqueTeams.length = 0; uniqueTeams.push(...newTeams);
-        // loadAuxSheet agora chama fillFilters internamente
-        await loadAuxSheet();
-        processVencimentoData(); 
-        setTimeout(()=>updateDashboard(),100);
-        document.getElementById('loadingMsg').innerHTML = `
-          <div style="color: #f59e0b; padding: 16px; background: #fef3c7; border-radius: 8px; margin: 12px 0;">
-            <strong>⚠️ Erro ao carregar planilha real:</strong><br>
-            ${e.message}<br><br>
-            <small>Verifique:
-              <ul style="margin: 8px 0; padding-left: 20px;">
-                <li>URL da planilha está correta?</li>
-                <li>Planilha está publicada em "Publicar na web"?</li>
-                <li>Backend está respondendo em /api/sheet?</li>
-              </ul>
-              <strong>Usando dados de teste para visualizar o dashboard com a meta do admin panel.</strong>
-            </small>
-          </div>
-        `;
-      }
+        uniqueMonths = [...new Set(rawData.map(r => `${r.ano}-${String(r.dataVenda.getMonth()+1).padStart(2,'0')}`))].sort((a,b)=>b.localeCompare(a));
+        uniqueTeams = [...new Set(rawData.map(r => r.equipe))].filter(Boolean);
+        uniqueVendedores = [...new Set(rawData.map(r => r.vendedor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+        uniqueSupervisores = [...new Set(rawData.map(r => r.supervisor))].filter(Boolean).sort((a,b)=>a.localeCompare(b));
+        fillFilters(); await loadAuxSheet(); document.getElementById('loadingMsg').style.display='none'; processVencimentoData(); setTimeout(()=>updateDashboard(),100);
+      } catch (e) { document.getElementById('loadingMsg').textContent = 'Erro ao carregar dados: ' + e.message; }
     }
 
     function setupVencimentoEventListeners() {
@@ -1485,17 +1406,97 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     }
 
     function bindUI() {
-  const monthSelect = document.getElementById('monthSelect'); const teamFilter = document.getElementById('teamFilter'); const vendedorFilter = document.getElementById('vendedorFilter'); const specificMonthFilter = document.getElementById('specificMonthFilter'); const refreshBtn = document.getElementById('refreshBtn');
+  const monthSelect = document.getElementById('monthSelect'); const teamFilter = document.getElementById('teamFilter'); const vendedorFilter = document.getElementById('vendedorFilter'); const refreshBtn = document.getElementById('refreshBtn');
+  const consentCheckbox = document.getElementById('lgpdConsent');
+  const rememberCheckbox = document.getElementById('rememberSheetUrl');
+  const clearLocalBtn = document.getElementById('clearLocalData');
+  const accessKeyInput = document.getElementById('accessKeyInput');
+  const secureLoginBtn = document.getElementById('secureLoginBtn');
+  const secureLogoutBtn = document.getElementById('secureLogoutBtn');
+  const secureStatusEl = document.getElementById('secureStatus');
+
+  const updateSecureUi = () => {
+    if (secureStatusEl) {
+      secureStatusEl.textContent = secureSession.authenticated
+        ? `Autenticado (${secureSession.filialId || 'filial'})`
+        : 'Não autenticado';
+    }
+    const isSecure = !!secureSession.authenticated;
+    if (secureLogoutBtn) secureLogoutBtn.style.display = isSecure ? 'inline-flex' : 'none';
+    if (secureLoginBtn) secureLoginBtn.disabled = isSecure;
+    const input = document.getElementById('sheetUrlInput');
+    const saveBtn = document.getElementById('saveSheetUrl');
+    if (input) input.disabled = isSecure;
+    if (saveBtn) saveBtn.disabled = isSecure;
+  };
+
+  if (consentCheckbox) consentCheckbox.checked = hasLgpdConsent();
+  if (rememberCheckbox) rememberCheckbox.checked = getRememberSheetUrl();
+  if (consentCheckbox) consentCheckbox.addEventListener('change', () => setLgpdConsent(consentCheckbox.checked));
+  if (clearLocalBtn) {
+    clearLocalBtn.addEventListener('click', () => {
+      clearLocalPrivacyData();
+      sheetUrl = '';
+      SHEET_CSV_URL = '';
+      window.AppState.sheetUrl = '';
+      const input = document.getElementById('sheetUrlInput');
+      if (input) input.value = '';
+      if (rememberCheckbox) rememberCheckbox.checked = false;
+      if (consentCheckbox) consentCheckbox.checked = false;
+      const loadingEl = document.getElementById('loadingMsg');
+      if (loadingEl) {
+        loadingEl.style.display = 'block';
+        loadingEl.textContent = 'Dados locais removidos com sucesso.';
+      }
+    });
+  }
+  if (secureLoginBtn && accessKeyInput) {
+    secureLoginBtn.addEventListener('click', async () => {
+      const accessKey = accessKeyInput.value.trim();
+      if (!accessKey) {
+        alert('Informe a chave de acesso da filial.');
+        return;
+      }
+      try {
+        secureLoginBtn.disabled = true;
+        secureLoginBtn.textContent = 'Entrando...';
+        const result = await secureAuthLogin(accessKey);
+        secureSession = { authenticated: true, filialId: result.filialId || '' };
+        if (secureStatusEl) secureStatusEl.textContent = `Autenticado (${secureSession.filialId || 'filial'})`;
+        updateSecureUi();
+        await loadSheetData();
+      } catch (err) {
+        alert('Falha no acesso seguro. Verifique sua chave.');
+      } finally {
+        secureLoginBtn.disabled = false;
+        secureLoginBtn.textContent = 'Entrar (modo seguro)';
+      }
+    });
+  }
+  if (secureLogoutBtn) {
+    secureLogoutBtn.addEventListener('click', async () => {
+      await secureAuthLogout();
+      secureSession = { authenticated: false, filialId: '' };
+      updateSecureUi();
+      await loadSheetData();
+    });
+  }
+
+  secureAuthMe().then(auth => {
+    secureSession = {
+      authenticated: !!auth.authenticated,
+      filialId: auth.filialId || ''
+    };
+    updateSecureUi();
+    if (secureSession.authenticated) loadSheetData();
+  });
+
       if (monthSelect) monthSelect.addEventListener('change', updateDashboard);
   if (teamFilter) teamFilter.addEventListener('change', ()=>{ populateVendedores(); updateDashboard(); });
   if (vendedorFilter) vendedorFilter.addEventListener('change', updateDashboard);
-  if (specificMonthFilter) specificMonthFilter.addEventListener('change', updateDashboard);
   if (refreshBtn) refreshBtn.onclick = async () => { try { refreshBtn.disabled = true; refreshBtn.textContent = 'Atualizando...'; await loadSheetData(); } finally { refreshBtn.disabled = false; refreshBtn.textContent = 'Atualizar Dados'; } };
   const btnPdf = document.getElementById('btnExportPdf');
   if (btnPdf) btnPdf.addEventListener('click', exportInadReportPdf);
-
-  const btnPdfApi = document.getElementById('btnExportPdfApi');
-  if (btnPdfApi) btnPdfApi.addEventListener('click', exportToPdfApi);
       const toggle6 = document.getElementById('toggle6Months'); const toggle12 = document.getElementById('toggle12Months'); const toggleProd = document.getElementById('toggleProduction');
       if (toggle6) toggle6.addEventListener('click', ()=>{ showingMonths=6; showingProduction=false; createEvolutionChart(); });
       if (toggle12) toggle12.addEventListener('click', ()=>{ showingMonths=12; showingProduction=false; createEvolutionChart(); });
@@ -1505,9 +1506,14 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
     if (saveBtn && input) {
         saveBtn.onclick = () => {
           const url = input.value.trim();
-          if (!url.startsWith('http') || !url.includes('docs.google.com/spreadsheets/')) { alert('Cole o link publicado da planilha Google.'); return; }
-          localStorage.setItem('sheetUrl', url);
-      sheetUrl = url; window.AppState.sheetUrl = url; SHEET_CSV_URL = url.includes('/pubhtml') ? url.replace('/pubhtml','/pub') + '&output=csv' : url;
+          const consent = !!consentCheckbox?.checked;
+          if (!consent) { alert('Marque o consentimento LGPD antes de carregar a planilha.'); return; }
+          const csvUrl = toPublishedCsvUrl(url);
+          if (!csvUrl) { alert('Use um link HTTPS publicado da planilha Google (pub/pubhtml ou output=csv).'); return; }
+          const remember = !!rememberCheckbox?.checked;
+          setLgpdConsent(consent);
+          setStoredSheetUrl(url, remember);
+      sheetUrl = url; window.AppState.sheetUrl = url; SHEET_CSV_URL = csvUrl;
           loadSheetData();
         };
       }
@@ -1623,11 +1629,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const { ini, fim } = getPeriodo82(new Date(ano, mes-1, 1));
       const promises = GAMIFICACAO_SOURCES.map(async (src) => {
         try {
-          // Usar proxy do backend para evitar CORS na Vercel
-          const baseUrl = window.location.origin;
-          const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(src.url);
-          const resp = await fetchWithTimeout(proxyUrl);
-          const csv = await resp.text();
+          const csv = await fetchCsv(src.url);
           const rows = parseCSV(csv).filter(r => r.dataVenda >= ini && r.dataVenda <= fim);
           return rows.map(r => ({ ...r, filial: r.filial || src.nome || 'Filial', regional: r.regional || src.regional || '', diretoria: r.diretoria || src.diretoria || '' }));
         } catch (e) {
@@ -1647,10 +1649,9 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       if (!url) return [];
       if (!selectedMonth) selectedMonth = ensureSelectedMonth();
       try {
-        // Usar proxy do backend para evitar CORS na Vercel
-        const baseUrl = window.location.origin;
-        const proxyUrl = `${baseUrl}/api/sheet?url=` + encodeURIComponent(url);
-        const resp = await fetch(proxyUrl);
+        const csvUrl = toPublishedCsvUrl(url);
+        if (!csvUrl) return [];
+        const resp = await fetch(csvUrl + (csvUrl.includes('?')?'&':'?') + 'cache=' + Date.now());
         if (!resp.ok) throw new Error('Falha ao baixar CSV do Dashboard');
         const csv = await resp.text();
         const data = parseCSV(csv);
@@ -1898,7 +1899,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       setTimeout(() => {
         try {
           // Detecta a filial do link inserido na dashboard
-          let sheetUrl = localStorage.getItem('sheetUrl') || '';
+          let sheetUrl = window.AppState.sheetUrl || '';
           let minhaFilial = '';
           if (sheetUrl) {
             // Procura na lista de fontes da gamificação
@@ -1923,7 +1924,7 @@ function stopConfetti() { if (confettiInterval) cancelAnimationFrame(confettiInt
       const loading = document.getElementById('loadingMsg'); if (loading) loading.style.display='none';
     }
 
-    return { init() { bindUI(); initData().then(()=>{ renderAll(); if (window.GamificationModule) { window.GamificationModule.initialize(); } }); } };
+    return { init() { bindUI(); initData().then(()=>renderAll()); } };
   })();
 
   // Inicialização do App
