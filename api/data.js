@@ -1,5 +1,5 @@
-const { json, getSession } = require('./_lib/security');
-const { resolveSourceByFilial } = require('./_lib/config');
+const { json, getSession } = require('../lib/security');
+const { resolveSourceByFilial } = require('../lib/config');
 
 function withGid(url, gid) {
   const parsed = new URL(url);

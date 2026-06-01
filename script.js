@@ -204,7 +204,7 @@ function escapeHtml(value) {
 
 async function secureAuthMe() {
   try {
-    const resp = await fetch('/api/auth/me', { method: 'GET', credentials: 'include' });
+    const resp = await fetch('/api/auth/login', { method: 'GET', credentials: 'include' });
     if (!resp.ok) return { authenticated: false };
     return await resp.json();
   } catch (_) {
@@ -225,8 +225,8 @@ async function secureAuthLogin(accessKey) {
 }
 
 async function secureAuthLogout() {
-  await fetch('/api/auth/logout', {
-    method: 'POST',
+  await fetch('/api/auth/login', {
+    method: 'DELETE',
     credentials: 'include'
   }).catch(() => {});
 }
