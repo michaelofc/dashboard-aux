@@ -1,5 +1,5 @@
-const { json, getSession } = require('../lib/security');
-const { resolveSourceByFilial } = require('../lib/config');
+import { json, getSession } from '../lib/security.js';
+import { resolveSourceByFilial } from '../lib/config.js';
 
 function withGid(url, gid) {
   const parsed = new URL(url);
@@ -9,7 +9,7 @@ function withGid(url, gid) {
   return parsed.toString();
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return json(res, 405, { error: 'method_not_allowed' });
   }
@@ -44,4 +44,4 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     return json(res, 502, { error: 'upstream_fetch_failed', message: err.message });
   }
-};
+}

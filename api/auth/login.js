@@ -1,7 +1,7 @@
-const { json, readJson, setSessionCookie, clearSessionCookie, getSession } = require('../../lib/security');
-const { resolveFilialIdByAccessKey, resolveSourceByFilial } = require('../../lib/config');
+import { json, readJson, setSessionCookie, clearSessionCookie, getSession } from '../../lib/security.js';
+import { resolveFilialIdByAccessKey, resolveSourceByFilial } from '../../lib/config.js';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === 'GET') {
     const session = getSession(req);
     if (!session) {
@@ -38,4 +38,4 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     return json(res, 400, { error: 'bad_request', message: err.message });
   }
-};
+}
